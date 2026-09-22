@@ -94,6 +94,12 @@
 
       <section class="card">
         <h2>3 · Layout peta <span class="pill pill-quiet">untuk laporan</span></h2>
+        <div class="tpl-row" id="tpl-row">
+          <button data-tpl="klasik" class="active" title="Gaya QGIS klasik: judul tengah-atas, elemen menyebar">Klasik</button>
+          <button data-tpl="rapat" title="Semua elemen di sisi kanan (gaya ArcGIS minimal)">Rapat Kanan</button>
+          <button data-tpl="modal" title="Judul di tengah-bawah, gaya peta akademik">Judul Bawah</button>
+          <button data-tpl="bersih" title="Hanya inti: judul, legenda, skala">Bersih</button>
+        </div>
         <label class="field field-tight">
           <span>Judul peta</span>
           <input id="layout-title" type="text" placeholder="mis. Peta Delinasi Wilayah Studi Kampus" maxlength="90">
@@ -153,7 +159,7 @@
     </aside>
 
     <!-- ---------- MAP ---------- -->
-    <div id="map-wrap">
+    <div id="map-wrap" class="tpl-klasik">
       <div id="map"></div>
 
       <!-- Elemen layout peta (untuk laporan) -->

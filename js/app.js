@@ -462,8 +462,42 @@ function setBasemap(id, skipSave) {
 /* -------------------- Layout peta (judul, legenda, utara, kredit) ---------- */
 const layout = {
   title: '', author: '',
-  showLegend: true, showNorth: true, showScale: true, showCredit: true
+  showLegend: true, showNorth: true, showScale: true, showCredit: true,
+  tpl: 'klasik'
 };
+
+// Template layout mengikuti konvensi QGIS/ArcGIS:
+// - klasik: judul tengah-atas, elemen menyebar (default QGIS)
+// - rapat:  semua elemen di sisi kanan (gaya ArcGIS minimal)
+// - modal:  judul di tengah-bawah (gaya peta akademik modern)
+// - bersih: hanya judul + legenda + skala
+const TEMPLATES = {
+  klasik: { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
+  rapat:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
+  modal:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
+  bersih: { showLegend: true,  showNorth: false, showScale: true,  showCredit: false }
+};
+
+function applyTemplate(id) {
+  if (!TEMPLATES[id]) return;
+  layout.tpl = id;
+  const t = TEMPLATES[id];
+  layout.showLegend = t.showLegend;
+  layout.showNorth = t.showNorth;
+  layout.showScale = t.showScale;
+  layout.showCredit = t.showCredit;
+
+  $('#map-wrap').className = 'tpl-' + id + (layout.title.trim() ? ' has-title' : '');
+  $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === id));
+
+  // Sinkronkan checkbox di panel
+  const map = { showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
+                showScale: '#layout-show-scale', showCredit: '#layout-show-credit' };
+  Object.keys(map).forEach(k => { if ($(map[k])) $(map[k]).checked = !!layout[k]; });
+
+  updateLayout();
+  save();
+}
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni',
                 'Juli','Agustus','September','Oktober','November','Desember'];
@@ -528,7 +562,10 @@ function updateLayout() {
   const hasTitle = !!layout.title.trim();
   titleEl.classList.toggle('hidden', !hasTitle);
   // Saat judul tampil, kotak pencarian digeser ke bawah (lihat css/style.css).
-  $('#map-wrap').classList.toggle('has-title', hasTitle);
+  // Pertahankan class template (tpl-*).
+  const wrap = $('#map-wrap');
+  wrap.classList.toggle('has-title', hasTitle);
+  if (!wrap.className.match(/tpl-\w+/)) wrap.classList.add('tpl-' + (layout.tpl || 'klasik'));
 
   // Kredit (nama, tanggal, sumber data, sistem koordinat)
   const creditEl = $('#map-credit');
@@ -576,6 +613,11 @@ function bindLayout() {
       updateLayout();
       save();
     });
+  });
+
+  // Pemilih template layout
+  $$('#tpl-row button').forEach(b => {
+    b.addEventListener('click', () => applyTemplate(b.dataset.tpl));
   });
 }
 
@@ -800,7 +842,8 @@ function save() {
       view: { lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() },
       layout: { title: layout.title, author: layout.author,
                 showLegend: layout.showLegend, showNorth: layout.showNorth,
-                showScale: layout.showScale, showCredit: layout.showCredit },
+                showScale: layout.showScale, showCredit: layout.showCredit,
+                tpl: layout.tpl },
       features: features.map(f => ({
         id: f.id, name: f.name, category: f.category, desc: f.desc, type: f.type,
         geometry: layerToGeometry(f.layer, f.type)
@@ -849,6 +892,12 @@ function load() {
     Object.keys(tg).forEach(k => {
       const el = $(tg[k]); if (el) el.checked = !!layout[k];
     });
+    // Terapkan template layout yang tersimpan
+    if (data.layout.tpl && TEMPLATES[data.layout.tpl]) {
+      layout.tpl = data.layout.tpl;
+      $('#map-wrap').classList.add('tpl-' + layout.tpl);
+      $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === layout.tpl));
+    }
   }
   (data.features || []).forEach(sf => {
     const type = sf.type || inferType(sf.geometry);

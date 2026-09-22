@@ -218,3 +218,34 @@ test('layout peta: pengaturan tersimpan & dipulihkan', async ({ page }) => {
   await expect(page.locator('#map-title')).toHaveText('Peta Tersimpan');
   await expect(page.locator('#map-north')).toHaveClass(/hidden/);
 });
+
+test('template layout: ganti template mengubah posisi elemen', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.locator('#layout-title').fill('Peta Template');
+  await page.locator('#layout-author').fill('Tester');
+  await page.waitForTimeout(200);
+
+  // Template "Judul Bawah" → judul pindah ke bawah
+  await page.locator('[data-tpl="modal"]').click();
+  await page.waitForTimeout(250);
+  await expect(page.locator('#map-wrap')).toHaveClass(/tpl-modal/);
+  const titleBox = await page.locator('#map-title').boundingBox();
+  expect(titleBox.y).toBeGreaterThan(400);
+
+  // Template "Bersih" → utara & kredit sembunyi
+  await page.locator('[data-tpl="bersih"]').click();
+  await page.waitForTimeout(250);
+  await expect(page.locator('#map-north')).toHaveClass(/hidden/);
+  await expect(page.locator('#map-credit')).toHaveClass(/hidden/);
+
+  // Kembali ke klasik → semua tampil lagi
+  await page.locator('[data-tpl="klasik"]').click();
+  await page.waitForTimeout(250);
+  await expect(page.locator('#map-north')).not.toHaveClass(/hidden/);
+
+  // Tersimpan
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('delinaisi-maker-v1')).layout.tpl);
+  expect(stored).toBe('klasik');
+});

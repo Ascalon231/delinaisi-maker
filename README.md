@@ -17,6 +17,9 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   **skala** (kiri-bawah), dan **kotak kredit** (kanan-bawah) berisi nama pembuat,
   tanggal, **sumber data** (menyesuaikan peta dasar), dan **sistem koordinat**.
   Semuanya ikut saat ekspor PNG / cetak PDF.
+- **4 template layout** gaya QGIS/ArcGIS tinggal pilih:
+  **Klasik** (elemen menyebar), **Rapat Kanan** (semua di sisi kanan),
+  **Judul Bawah** (gaya akademik modern), dan **Bersih** (hanya inti).
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
 - **Edit bentuk** ulang lewat alat Edit
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)
@@ -49,7 +52,7 @@ npm test
 
 Test memverifikasi: peta dimuat tanpa error, gambar poligon & hitung luas, simpan atribut,
 daftar fitur, penyimpanan localStorage & pemulihan, ekspor GeoJSON, marker dengan koordinat,
-ganti peta dasar, serta tampilan & persistensi layout peta.
+ganti peta dasar, tampilan & persistensi layout peta, serta ganti template layout.
 
 > Catatan: di beberapa environment headless, `localStorage` tidak bertahan setelah `reload()`.
 > Test pemulihan memakai `addInitScript` untuk menyimulasikan storage persisten.
