@@ -1,0 +1,14 @@
+# Dependency
+node_modules/
+
+# Browser & cache hasil instalasi test
+.test/
+test-results/
+
+# Log
+npm-debug.log*
+*.log
+
+# Sistem
+.DS_Store
+Thumbs.db

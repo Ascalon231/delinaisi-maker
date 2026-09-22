@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delinaisi Maker — Buat Peta Delinasi di Browser</title>
+  <meta name="description" content="Web sederhana untuk membuat peta delinasi: gambar poligon, garis, dan titik di peta, hitung luas & keliling, lalu ekspor ke GeoJSON atau PNG. Gratis, tanpa login.">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="">
+  <!-- Leaflet.draw -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css"
+        integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ================= HEADER ================= -->
+  <header id="topbar">
+    <button id="sidebar-toggle" aria-label="Buka/tutup panel">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#fff" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round">
+        <path d="M12 2 L20 6 v6 c0 5 -3.4 8.4 -8 10 -4.6 -1.6 -8 -5 -8 -10 V6 z"/>
+        <path d="M8.5 11.5 L11 14 L15.5 9"/>
+      </svg>
+      <div>
+        <h1>Delinaisi&nbsp;Maker</h1>
+        <p>Buat peta delinasi langsung di browser — gratis &amp; tanpa login</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="save-state" class="save-state" title="Pekerjaanmu otomatis tersimpan di browser ini">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17 l-5 -5"/></svg>
+        <span id="save-state-text">Tersimpan</span>
+      </span>
+      <button id="btn-help" class="btn btn-ghost" title="Cara pakai">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2 A2.5 2.5 0 1 1 12 12 v1.5"/><line x1="12" y1="17" x2="12" y2="17.1"/></svg>
+        Bantuan
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= LAYOUT ================= -->
+  <main id="app">
+
+    <!-- ---------- SIDEBAR ---------- -->
+    <aside id="sidebar">
+
+      <section class="card">
+        <h2>1 · Pilih peta dasar</h2>
+        <div class="basemap-row" id="basemap-row">
+          <button data-basemap="streets" class="active">Peta Jalan</button>
+          <button data-basemap="satellite">Satelit</button>
+          <button data-basemap="light">Minimal</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2 · Gambar di peta</h2>
+        <div class="tools" id="tools">
+          <button class="tool" data-tool="Marker">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21 s-7 -6.2 -7 -11 a7 7 0 0 1 14 0 c0 4.8 -7 11 -7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+            <span>Titik</span>
+          </button>
+          <button class="tool" data-tool="Polyline">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18 L8 8 L13 14 L21 4"/></svg>
+            <span>Garis</span>
+          </button>
+          <button class="tool" data-tool="Polygon">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L20.5 8 v9 L12 21 L3.5 17 v-9 z"/></svg>
+            <span>Poligon</span>
+          </button>
+          <button class="tool" data-tool="Rectangle">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/></svg>
+            <span>Persegi</span>
+          </button>
+          <button class="tool" data-tool="Circle">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="8.5"/></svg>
+            <span>Lingkaran</span>
+          </button>
+          <button class="tool" id="tool-edit">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 h4 L20 8 l-4 -4 L4 16 z"/><line x1="14.5" y1="7.5" x2="16.5" y2="9.5"/></svg>
+            <span>Edit</span>
+          </button>
+        </div>
+        <p class="hint" id="draw-hint">Pilih salah satu alat di atas, lalu klik di peta untuk mulai menggambar. Klik dua kali (atau Enter) untuk selesaikan poligon/garis.</p>
+      </section>
+
+      <section class="card">
+        <h2>3 · Layout peta <span class="pill pill-quiet">untuk laporan</span></h2>
+        <label class="field field-tight">
+          <span>Judul peta</span>
+          <input id="layout-title" type="text" placeholder="mis. Peta Delinasi Wilayah Studi Kampus" maxlength="90">
+        </label>
+        <label class="field field-tight">
+          <span>Dibuat oleh</span>
+          <input id="layout-author" type="text" placeholder="mis. Budi, Mahasiswa Geografi" maxlength="60">
+        </label>
+        <div class="layout-toggles">
+          <label class="toggle"><input type="checkbox" id="layout-show-legend" checked><span>Legenda</span></label>
+          <label class="toggle"><input type="checkbox" id="layout-show-north" checked><span>Arah utara</span></label>
+          <label class="toggle"><input type="checkbox" id="layout-show-scale" checked><span>Skala</span></label>
+          <label class="toggle"><input type="checkbox" id="layout-show-credit" checked><span>Kredit</span></label>
+        </div>
+        <p class="hint">Elemen ini tampil di atas peta dan ikut tercetak saat ekspor PNG / cetak PDF.</p>
+      </section>
+
+      <section class="card card-flex">
+        <div class="card-head">
+          <h2>4 · Daftar fitur <span class="pill" id="feat-count">0</span></h2>
+          <button id="btn-clear" class="btn btn-danger-ghost btn-sm" title="Hapus semua fitur">Hapus semua</button>
+        </div>
+        <div id="feat-list"></div>
+        <div id="feat-empty" class="empty">
+          <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#b3bccb" stroke-width="1.6" stroke-linejoin="round"><path d="M12 3 L20.5 8 v9 L12 21 L3.5 17 v-9 z"/><path d="M12 3 v18 M3.5 8 L20.5 17 M20.5 8 L3.5 17"/></svg>
+          <p>Belum ada fitur.</p>
+          <small>Gambar sesuatu di peta, atau <button id="btn-import-empty" class="link-btn">impor GeoJSON</button>.</small>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>5 · Simpan &amp; ekspor</h2>
+        <div class="export-grid">
+          <button id="btn-export-geojson" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 v12"/><path d="M7.5 11 L12 15.5 L16.5 11"/><path d="M4 20 h16"/></svg>
+            GeoJSON
+          </button>
+          <button id="btn-export-png" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M4 18 L10 12 L15 17 L18 14.5 L20 16.5"/></svg>
+            Gambar PNG
+          </button>
+          <button id="btn-import" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15 V3"/><path d="M7.5 7.5 L12 3 L16.5 7.5"/><path d="M4 20 h16"/></svg>
+            Impor GeoJSON
+          </button>
+          <button id="btn-print" class="btn btn-secondary">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 9 V4 h10 v5"/><rect x="4" y="9" width="16" height="7" rx="1.5"/><path d="M7 16 h10 v4 h-10 z"/></svg>
+            Cetak / PDF
+          </button>
+        </div>
+        <input type="file" id="file-input" accept=".geojson,.json,application/geo+json,application/json" hidden>
+      </section>
+
+      <footer class="side-foot">
+        <p>Dibuat untuk mahasiswa &amp; siapa saja. Data hanya tersimpan di browsermu — tidak dikirim ke server.</p>
+      </footer>
+    </aside>
+
+    <!-- ---------- MAP ---------- -->
+    <div id="map-wrap">
+      <div id="map"></div>
+
+      <!-- Elemen layout peta (untuk laporan) -->
+      <div id="map-title" class="map-elem hidden"></div>
+
+      <div id="map-legend" class="map-elem hidden">
+        <div class="map-legend-head">Legenda</div>
+        <div id="map-legend-list"></div>
+      </div>
+
+      <div id="map-north" class="map-elem hidden">
+        <svg viewBox="0 0 24 40" width="22" height="38" aria-label="Utara">
+          <path d="M12 2 L20 30 L12 24 L4 30 Z" fill="#2f3b4d"/>
+          <text x="12" y="13" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" font-family="sans-serif">N</text>
+        </svg>
+      </div>
+
+      <div id="map-credit" class="map-elem hidden">
+        <span id="map-credit-author"></span><span id="map-credit-sep" class="sep"> · </span><span id="map-credit-date"></span>
+      </div>
+
+      <div id="search-box">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+        <input id="search-input" type="search" placeholder="Cari lokasi (mis. kampus, kota, alamat)…" autocomplete="off" aria-label="Cari lokasi">
+        <div id="search-results"></div>
+      </div>
+
+      <div id="measure-badge" class="hidden"></div>
+      <div id="coord-badge">—</div>
+    </div>
+  </main>
+
+  <!-- ================= MODAL ATRIBUT ================= -->
+  <div id="modal-overlay" class="hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h2 id="modal-title">Detail fitur</h2>
+      <label class="field">
+        <span>Nama fitur</span>
+        <input id="attr-name" type="text" placeholder="mis. Batas Kel Sukamaju" maxlength="80">
+      </label>
+      <label class="field">
+        <span>Jenis delinasi</span>
+        <select id="attr-category"></select>
+      </label>
+      <label class="field">
+        <span>Keterangan</span>
+        <textarea id="attr-desc" rows="3" placeholder="Catatan singkat untuk tugas/laporan… (opsional)" maxlength="400"></textarea>
+      </label>
+      <div class="field">
+        <span>Hasil ukur</span>
+        <div id="attr-measure" class="measure-box"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="attr-cancel" class="btn btn-ghost">Batal</button>
+        <button id="attr-save" class="btn btn-primary">Simpan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL BANTUAN ================= -->
+  <div id="help-overlay" class="hidden">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="help-title">
+      <h2 id="help-title">Cara pakai <span class="emoji">🗺️</span></h2>
+      <ol class="help-list">
+        <li><b>Cari lokasi</b> lewat kotak pencarian, atau zoom &amp; geser peta ke daerahmu.</li>
+        <li><b>Pilih alat gambar</b> (Titik / Garis / Poligon / Persegi / Lingkaran), lalu klik di peta. Untuk poligon &amp; garis, klik setiap titik lalu klik dua kali (atau tekan Enter) untuk selesai.</li>
+        <li><b>Isi detail</b>: nama, jenis deliniasi, dan keterangan. Luas &amp; keliling dihitung otomatis.</li>
+        <li><b>Edit</b> kapan saja pakai alat Edit, atau klik kanan pada fitur. Klik fitur di panel untuk lompat ke lokasinya.</li>
+        <li><b>Ekspor</b> ke GeoJSON (bisa dibuka di QGIS) atau PNG untuk laporan. Pekerjaanmu otomatis tersimpan di browser.</li>
+      </ol>
+      <div class="modal-actions">
+        <button id="help-close" class="btn btn-primary">Mengerti, mulai!</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <!-- ================= LIBS ================= -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"
+          integrity="sha384-JP5UPxIO2Tm2o79Fb0tGYMa44jkWar53aBoCbd8ah0+LcCDoohTIYr+zIXyfGIJN" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

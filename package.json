@@ -1,0 +1,18 @@
+{
+  "name": "delinaisi-maker",
+  "version": "1.0.0",
+  "description": "Web sederhana untuk membuat peta delinasi yang bisa digunakan siapa saja — terutama mahasiswa. Gambar poligon, garis, atau titik di atas peta, otomatis dapat luas & keliling, isi nama dan keterangan, lalu ekspor ke GeoJSON atau PNG untuk laporan/tugas.",
+  "main": "index.html",
+  "scripts": {
+    "test": "node node_modules/playwright/cli.js test",
+    "start": "python3 -m http.server 8000"
+  },
+  "keywords": ["peta", "delinasi", "gis", "leaflet", "mahasiswa", "geojson"],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "playwright": "^1.63.0"
+  }
+}
