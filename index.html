@@ -16,11 +16,12 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <a class="skip-link" href="#map-wrap">Lewati ke peta</a>
 
   <!-- ================= HEADER ================= -->
   <header id="topbar">
     <button id="sidebar-toggle" aria-label="Buka/tutup panel">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
         <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
       </svg>
     </button>
@@ -40,7 +41,7 @@
         <span id="save-state-text">Tersimpan</span>
       </span>
       <button id="btn-help" class="btn btn-ghost" title="Cara pakai">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2 A2.5 2.5 0 1 1 12 12 v1.5"/><line x1="12" y1="17" x2="12" y2="17.1"/></svg>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2 A2.5 2.5 0 1 1 12 12 v1.5"/><line x1="12" y1="17" x2="12" y2="17.1"/></svg>
         Bantuan
       </button>
     </div>
@@ -50,6 +51,10 @@
   <main id="app">
 
     <!-- ---------- SIDEBAR ---------- -->
+    <div id="sidebar-backdrop"></div>
+    <button id="sidebar-close" aria-label="Tutup panel">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
     <aside id="sidebar">
 
       <section class="card">
@@ -90,6 +95,13 @@
           </button>
         </div>
         <p class="hint" id="draw-hint">Pilih salah satu alat di atas, lalu klik di peta untuk mulai menggambar. Klik dua kali (atau Enter) untuk selesaikan poligon/garis.</p>
+        <div class="kbd-row">
+          <span class="kbd-hint"><kbd>T</kbd> Titik</span>
+          <span class="kbd-hint"><kbd>G</kbd> Garis</span>
+          <span class="kbd-hint"><kbd>P</kbd> Poligon</span>
+          <span class="kbd-hint"><kbd>E</kbd> Edit</span>
+          <span class="kbd-hint"><kbd>Esc</kbd> Batal</span>
+        </div>
       </section>
 
       <section class="card">
@@ -161,6 +173,7 @@
     <!-- ---------- MAP ---------- -->
     <div id="map-wrap" class="tpl-klasik">
       <div id="map"></div>
+      <div id="tile-loader" class="hidden" role="status" aria-label="Memuat peta…"><div class="tile-loader-bar"></div></div>
 
       <!-- Elemen layout peta (untuk laporan) -->
       <div id="map-title" class="map-elem hidden"></div>
@@ -239,7 +252,7 @@
     </div>
   </div>
 
-  <div id="toast" class="toast"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <!-- ================= LIBS ================= -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"

@@ -23,6 +23,13 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
 - **Edit bentuk** ulang lewat alat Edit
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)
+- **Ramah pengguna & mudah diakses**:
+  - **Pintasan keyboard** — `T` titik, `G` garis, `P` poligon, `K` kotak, `B` bulat, `E` edit, `Esc` batal
+  - **Urungkan (undo)** — fitur yang tak sengaja dihapus bisa dipulihkan lewat toast
+  - **Indikator memuat** — bar tipis di atas peta saat tile dimuat
+  - **Aksesibilitas** — aria-label di semua tombol ikon, focus trap di modal, skip link,
+    dukungan `prefers-reduced-motion`
+  - **Responsif penuh** — di layar kecil, panel kiri jadi drawer dengan backdrop & tombol tutup
 - **Ekspor GeoJSON** (bisa dibuka di QGIS) atau **PNG** (untuk laporan)
 - **Cetak / PDF** langsung dari browser
 - **Otomatis tersimpan** di browser (localStorage) — aman dari refresh tak sengaja

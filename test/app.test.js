@@ -111,6 +111,68 @@ test('tersimpan ke localStorage & termuat ulang', async ({ page }) => {
   await expect(page.locator('.feat-name')).toHaveText('Wilayah Uji');
 });
 
+test('undo: fitur yang dihapus bisa dipulihkan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  await page.locator('.tool[data-tool="Marker"]').click();
+  await page.locator('#map').click({ position: { x: 600, y: 300 } });
+  await page.locator('#attr-name').fill('Marker Uji');
+  await page.locator('#attr-save').click();
+  await page.waitForTimeout(300);
+  await expect(page.locator('#feat-count')).toHaveText('1');
+
+  // Hapus
+  await page.locator('.feat-acts .icon-btn.del').click();
+  await page.waitForTimeout(300);
+  await expect(page.locator('#feat-count')).toHaveText('0');
+  // Toast undo muncul
+  await expect(page.locator('#toast .toast-action')).toHaveText('Urungkan');
+
+  // Klik Urungkan
+  await page.locator('#toast .toast-action').click();
+  await page.waitForTimeout(300);
+  await expect(page.locator('#feat-count')).toHaveText('1');
+  await expect(page.locator('.feat-name')).toHaveText('Marker Uji');
+});
+
+test('pintasan keyboard mengaktifkan alat gambar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  await page.keyboard.press('p');
+  await page.waitForTimeout(250);
+  await expect(page.locator('.tool[data-tool="Polygon"]')).toHaveClass(/active/);
+
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  await expect(page.locator('.tool[data-tool="Polygon"]')).not.toHaveClass(/active/);
+});
+
+test('mobile: drawer sidebar bisa buka & tutup', async ({ browser }) => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  // Awalnya tertutup
+  await expect(page.locator('#sidebar')).toHaveClass(/closed/);
+  await expect(page.locator('#sidebar-close')).not.toHaveClass(/show/);
+
+  // Buka
+  await page.evaluate(() => document.querySelector('#sidebar-toggle').click());
+  await page.waitForTimeout(600);
+  await expect(page.locator('#sidebar')).not.toHaveClass(/closed/);
+  await expect(page.locator('#sidebar-close')).toHaveClass(/show/);
+
+  // Tombol X menutup
+  await page.evaluate(() => document.querySelector('#sidebar-close').click());
+  await page.waitForTimeout(600);
+  await expect(page.locator('#sidebar')).toHaveClass(/closed/);
+});
+
 test('ekspor GeoJSON mengunduh file yang valid', async ({ page }) => {
   await page.goto(APP);
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });

@@ -92,6 +92,14 @@ let editingFeatureId = null;
 let currentBasemap = 'streets';
 let searchMarker = null;
 
+/* -------------------- Sidebar (mobile) -------------------- */
+function closeSidebarMobile() {
+  if (window.innerWidth > 860) return;
+  $('#sidebar').classList.add('closed');
+  const bd = $('#sidebar-backdrop');
+  if (bd) bd.classList.remove('show');
+}
+
 /* -------------------- Util -------------------- */
 const $  = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
@@ -103,12 +111,28 @@ function esc(s) {
 }
 
 let toastTimer;
-function toast(msg) {
+// toast(msg, {actionLabel, onAction}) — mendukung tombol aksi (mis. "Urungkan").
+function toast(msg, opts) {
   const t = $('#toast');
-  t.textContent = msg;
+  opts = opts || {};
+  t.innerHTML = '';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  t.appendChild(span);
+  if (opts.actionLabel) {
+    const btn = document.createElement('button');
+    btn.className = 'toast-action';
+    btn.textContent = opts.actionLabel;
+    btn.addEventListener('click', () => {
+      t.classList.remove('show');
+      clearTimeout(toastTimer);
+      if (typeof opts.onAction === 'function') opts.onAction();
+    });
+    t.appendChild(btn);
+  }
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 2300);
+  toastTimer = setTimeout(() => t.classList.remove('show'), opts.actionLabel ? 5500 : 2300);
 }
 
 function catOf(id) {
@@ -255,15 +279,15 @@ function renderList() {
     el.innerHTML =
       '<span class="feat-swatch ' + (f.type === 'Marker' ? 'dot' : '') + '" style="background:' + color + '"></span>' +
       '<div class="feat-main">' +
-        '<div class="feat-name ' + (f.name ? '' : 'noname') + '">' + esc(f.name) || 'Tanpa nama' + '</div>' +
+        '<div class="feat-name ' + (f.name ? '' : 'noname') + '">' + (esc(f.name) || 'Tanpa nama') + '</div>' +
         '<div class="feat-meta">' + esc(meta) + '</div>' +
       '</div>' +
       '<div class="feat-acts">' +
-        '<button class="icon-btn" data-act="zoom" title="Lompat ke fitur">' +
+        '<button class="icon-btn" data-act="zoom" title="Lompat ke fitur" aria-label="Lompat ke fitur">' +
           '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg></button>' +
-        '<button class="icon-btn" data-act="edit" title="Edit detail">' +
+        '<button class="icon-btn" data-act="edit" title="Edit detail" aria-label="Edit detail">' +
           '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 h4 L20 8 l-4 -4 L4 16 z"/></svg></button>' +
-        '<button class="icon-btn del" data-act="del" title="Hapus fitur">' +
+        '<button class="icon-btn del" data-act="del" title="Hapus fitur" aria-label="Hapus fitur">' +
           '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7 h16 M9 7 V4 h6 v3 M6 7 l1 13 h10 l1 -13"/></svg></button>' +
       '</div>';
 
@@ -296,7 +320,7 @@ function zoomTo(f) {
     map.flyToBounds(f.layer.getBounds(), { duration: .6, padding: [40, 40] });
     setTimeout(() => f.layer.openPopup(), 650);
   }
-  if (window.innerWidth <= 860) $('#sidebar').classList.add('closed');
+  closeSidebarMobile();
 }
 
 function refreshFeature(f) {
@@ -323,22 +347,44 @@ function deleteFeature(id) {
   const i = features.findIndex(f => f.id === id);
   if (i < 0) return;
   map.closePopup();
-  drawnItems.removeLayer(features[i].layer);
+  const removed = features[i];
+  drawnItems.removeLayer(removed.layer);
   features.splice(i, 1);
   renderList();
   save();
-  toast('Fitur dihapus');
+  // Tawarkan urungkan penghapusan (safety net, sangat penting untuk mahasiswa!).
+  toast('Fitur "' + (removed.name || 'tanpa nama') + '" dihapus', {
+    actionLabel: 'Urungkan',
+    onAction: () => {
+      if (features.some(f => f.id === removed.id)) return;
+      features.push(removed);
+      drawnItems.addLayer(removed.layer);
+      renderList();
+      save();
+      toast('Fitur dipulihkan');
+    }
+  });
 }
 
 function clearAll() {
   if (!features.length) { toast('Tidak ada fitur untuk dihapus'); return; }
   if (!confirm('Hapus semua ' + features.length + ' fitur dari peta? Tindakan ini tidak bisa dibatalkan.')) return;
   map.closePopup();
+  const backup = features.slice();
   features.forEach(f => drawnItems.removeLayer(f.layer));
   features = [];
   renderList();
   save();
-  toast('Semua fitur dihapus');
+  toast('Semua fitur dihapus', {
+    actionLabel: 'Urungkan',
+    onAction: () => {
+      features = backup;
+      features.forEach(f => drawnItems.addLayer(f.layer));
+      renderList();
+      save();
+      toast(backup.length + ' fitur dipulihkan');
+    }
+  });
 }
 
 /* -------------------- Gambar di peta -------------------- */
@@ -433,6 +479,20 @@ function closeAttrModal() {
   editingFeatureId = null;
 }
 
+// Focus trap: menjaga fokus Tab tetap di dalam modal (aksesibilitas).
+function trapFocus(container, e) {
+  const focusables = Array.from(container.querySelectorAll(
+    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+  )).filter(el => !el.disabled && el.offsetParent !== null);
+  if (!focusables.length) return;
+  const first = focusables[0], last = focusables[focusables.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault(); last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault(); first.focus();
+  }
+}
+
 /* -------------------- Peta dasar -------------------- */
 const BASEMAPS = {
   streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -455,6 +515,15 @@ function setBasemap(id, skipSave) {
   currentBasemap = id;
   map.addLayer(BASEMAPS[id]);
   BASEMAPS[id].bringToBack();
+  // Indikator loading: tampil saat tile masih dimuat.
+  const layer = BASEMAPS[id];
+  const loader = $('#tile-loader');
+  if (loader && !layer.__loaderBound) {
+    layer.__loaderBound = true;
+    layer.on('loading', () => loader.classList.remove('hidden'));
+    layer.on('load', () => loader.classList.add('hidden'));
+  }
+  if (loader) loader.classList.remove('hidden');
   $$('#basemap-row button').forEach(b => b.classList.toggle('active', b.dataset.basemap === id));
   if (!skipSave) save();
 }
@@ -658,7 +727,7 @@ function showResults(data) {
         .addTo(map).bindPopup(esc(d.display_name)).openPopup();
       box.classList.remove('show');
       $('#search-input').value = '';
-      if (window.innerWidth <= 860) $('#sidebar').classList.add('closed');
+      closeSidebarMobile();
     });
     box.appendChild(el);
   });
@@ -1040,6 +1109,9 @@ function init() {
   $('#modal-overlay').addEventListener('click', (e) => {
     if (e.target === $('#modal-overlay')) closeAttrModal();
   });
+  $('#modal-overlay').addEventListener('keydown', (e) => {
+    if (e.key === 'Tab') trapFocus($('#modal-overlay .modal'), e);
+  });
 
   // ---- Bantuan ----
   $('#btn-help').addEventListener('click', () => $('#help-overlay').classList.remove('hidden'));
@@ -1085,20 +1157,68 @@ function init() {
   });
 
   // ---- Sidebar (mobile) ----
-  $('#sidebar-toggle').addEventListener('click', () => $('#sidebar').classList.toggle('closed'));
+  // ---- Sidebar (mobile): drawer dengan backdrop + tombol tutup ----
+  const syncBackdrop = () => {
+    const sb = $('#sidebar');
+    const closed = sb.classList.contains('closed');
+    const mobile = window.innerWidth <= 860;
+    $('#sidebar-backdrop').classList.toggle('show', !closed && mobile);
+    // Tombol X posisinya di pojok kanan-atas sidebar terbuka
+    const x = $('#sidebar-close');
+    if (x) {
+      const w = Math.min(320, window.innerWidth * 0.88);
+      x.style.left = (closed ? -60 : w - 44) + 'px';
+      x.classList.toggle('show', !closed && mobile);
+    }
+  };
+  $('#sidebar-toggle').addEventListener('click', () => {
+    $('#sidebar').classList.toggle('closed');
+    syncBackdrop();
+  });
+  $('#sidebar-close').addEventListener('click', () => {
+    $('#sidebar').classList.add('closed');
+    syncBackdrop();
+  });
+  $('#sidebar-backdrop').addEventListener('click', () => {
+    $('#sidebar').classList.add('closed');
+    syncBackdrop();
+  });
+  if (window.innerWidth <= 860) $('#sidebar').classList.add('closed');
+  window.addEventListener('resize', syncBackdrop);
+  syncBackdrop();
 
   // ---- Keyboard ----
+  // Pintasan: T=titik, G=garis, P=poligon, K=kotak, B=bulat, E=edit, Esc=batal
+  const SHORTCUTS = {
+    t: 'Marker', g: 'Polyline', p: 'Polygon',
+    k: 'Rectangle', b: 'Circle'
+  };
   document.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') {
       if (e.key === 'Escape') e.target.blur();
       return;
     }
+    // jangan ganggu saat modifikasi teks di contenteditable
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
     if (e.key === 'Escape') {
       if (currentDrawer) { stopDraw(); toast('Gambar dibatalkan'); }
       if (editHandler) stopEdit();
       $('#modal-overlay').classList.add('hidden');
       $('#help-overlay').classList.add('hidden');
+      $('#search-results').classList.remove('show');
+      return;
+    }
+
+    const key = e.key.toLowerCase();
+    if (SHORTCUTS[key]) {
+      e.preventDefault();
+      if (currentDrawer && currentDrawerType === SHORTCUTS[key]) { stopDraw(); return; }
+      startDraw(SHORTCUTS[key]);
+    } else if (key === 'e') {
+      e.preventDefault();
+      toggleEdit();
     }
   });
 
