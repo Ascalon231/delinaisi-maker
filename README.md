@@ -12,8 +12,11 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
 - **Gambar di peta**: titik, garis, poligon, persegi, lingkaran
 - **Hitung otomatis**: luas (m²/ha/km²), keliling/panjang (m/km), koordinat
 - **Label & atribut**: nama, jenis deliniasi (8 kategori dengan warna berbeda), keterangan
-- **Layout peta** untuk laporan: **judul peta**, **legenda** (update otomatis), **arah utara**,
-  **skala**, dan **kotak kredit** (nama + tanggal) — semuanya ikut saat ekspor PNG / cetak PDF
+- **Layout peta** mengikuti standar kartografi Indonesia (8 elemen wajib):
+  **judul** (tengah-atas), **legenda** (kanan, auto-update), **arah utara** (kanan-atas),
+  **skala** (kiri-bawah), dan **kotak kredit** (kanan-bawah) berisi nama pembuat,
+  tanggal, **sumber data** (menyesuaikan peta dasar), dan **sistem koordinat**.
+  Semuanya ikut saat ekspor PNG / cetak PDF.
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
 - **Edit bentuk** ulang lewat alat Edit
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)

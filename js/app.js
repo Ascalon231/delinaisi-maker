@@ -472,8 +472,17 @@ function formatDateID(d) {
   return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
 }
 
-function updateLegend() {
-  const legendEl = $('#map-legend');
+// Sumber data per peta dasar (untuk kotak kredit & ekspor).
+function basemapAttribution(id) {
+  const m = {
+    streets: 'OpenStreetMap & kontributornya',
+    satellite: 'Esri, Maxar, Earthstar Geographics',
+    light: 'OpenStreetMap & CARTO'
+  };
+  return m[id] || 'OpenStreetMap';
+}
+
+function updateLegend() {  const legendEl = $('#map-legend');
   if (!legendEl) return;
   const listEl = $('#map-legend-list');
   listEl.innerHTML = '';
@@ -516,14 +525,18 @@ function updateLayout() {
   // Judul
   const titleEl = $('#map-title');
   titleEl.textContent = layout.title;
-  titleEl.classList.toggle('hidden', !layout.title.trim());
+  const hasTitle = !!layout.title.trim();
+  titleEl.classList.toggle('hidden', !hasTitle);
+  // Saat judul tampil, kotak pencarian digeser ke bawah (lihat css/style.css).
+  $('#map-wrap').classList.toggle('has-title', hasTitle);
 
-  // Kredit
+  // Kredit (nama, tanggal, sumber data, sistem koordinat)
   const creditEl = $('#map-credit');
-  $('#map-credit-author').textContent = layout.author.trim();
-  $('#map-credit-date').textContent = formatDateID(new Date());
   const hasAuthor = !!layout.author.trim();
-  $('#map-credit-sep').style.display = hasAuthor ? '' : 'none';
+  $('#map-credit-author').textContent = hasAuthor ? 'Dibuat oleh: ' + layout.author.trim() : '';
+  $('#map-credit-date').textContent = 'Tanggal: ' + formatDateID(new Date());
+  $('#map-credit-source').textContent = 'Sumber data: ' + basemapAttribution(currentBasemap);
+  $('#map-credit-crs').textContent = 'Sistem koordinat: WGS 84 (EPSG:4326)';
   creditEl.classList.toggle('hidden', !layout.showCredit || !hasAuthor);
 
   // Legenda
@@ -688,6 +701,13 @@ function exportGeoJSON() {
     type: 'FeatureCollection',
     name: 'peta-delinasi',
     crs: { type: 'name', properties: { name: 'urn:ogc:def:crs:EPSG::4326' } },
+    metadata: {
+      title: layout.title || 'Peta Delinasi',
+      author: layout.author || '',
+      date: new Date().toISOString().slice(0, 10),
+      datasource: basemapAttribution(currentBasemap),
+      crs: 'WGS 84 (EPSG:4326)'
+    },
     features: features.map(f => {
       let geometry;
       if (f.type === 'Circle') {

@@ -241,7 +241,10 @@ svg { display: block; }
   display: flex; align-items: center; gap: 8px;
   background: #fff; border: 1px solid var(--line); border-radius: 10px;
   padding: 8px 11px; box-shadow: var(--shadow-md);
+  transition: top .2s ease;
 }
+/* Saat judul peta tampil, kotak pencarian turun agar tidak bertabrakan. */
+#map-wrap.has-title #search-box { top: 56px; }
 #search-box > svg { flex: none; color: var(--ink-faint); }
 #search-input { flex: 1 1 auto; border: 0; outline: none; background: none; font-size: 13.5px; min-width: 0; }
 #search-input::placeholder { color: var(--ink-faint); }
@@ -384,8 +387,11 @@ svg { display: block; }
 }
 #map-title:empty { display: none; }
 
+/* Standar kartografi: arah utara kanan-atas. */
+#map-north { right: 14px; top: 14px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.22)); }
+
 #map-legend {
-  right: 12px; top: 56px;
+  right: 12px; top: 62px;
   background: rgba(255,255,255,.95);
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -407,16 +413,16 @@ svg { display: block; }
 .legend-count { margin-left: auto; color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
 .legend-empty { color: var(--ink-faint); font-style: italic; font-size: 11.5px; }
 
-#map-north { right: 14px; bottom: 52px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.22)); }
-
 #map-credit {
   right: 14px; bottom: 14px;
   background: rgba(255,255,255,.93);
   border: 1px solid var(--line);
-  border-radius: 7px; padding: 4px 10px;
-  font-size: 10.5px; color: var(--ink-soft); font-weight: 600;
+  border-radius: 7px; padding: 5px 10px;
+  font-size: 10px; color: var(--ink-soft); font-weight: 600;
   box-shadow: var(--shadow-sm);
+  line-height: 1.5; text-align: right; max-width: 250px;
 }
+#map-credit div:empty { display: none; }
 #map-credit .sep { color: var(--ink-faint); margin: 0 3px; }
 
 /* ---------- panel layout (sidebar) ---------- */
@@ -465,8 +471,9 @@ svg { display: block; }
   #measure-badge { bottom: 64px; }
   /* Layout elemen: lebih kecil & menghindari kotak pencarian */
   #map-title { max-width: calc(100% - 24px); top: 10px; font-size: 13px; }
-  #map-legend { top: auto; bottom: 70px; right: 10px; min-width: 118px; }
-  #map-north { bottom: auto; top: 52px; right: 10px; }
+  #map-wrap.has-title #search-box { top: 52px; width: calc(100% - 24px); }
+  #map-legend { top: auto; bottom: 70px; right: 10px; min-width: 118px; max-height: 40vh; overflow-y: auto; }
+  #map-north { top: 12px; bottom: auto; right: 10px; }
   #map-credit { bottom: 70px; right: 10px; display: none; }
 }
 
