@@ -17,9 +17,22 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   **skala** (kiri-bawah), dan **kotak kredit** (kanan-bawah) berisi nama pembuat,
   tanggal, **sumber data** (menyesuaikan peta dasar), dan **sistem koordinat**.
   Semuanya ikut saat ekspor PNG / cetak PDF.
-- **4 template layout** gaya QGIS/ArcGIS tinggal pilih:
+- **5 template layout** gaya QGIS/ArcGIS tinggal pilih:
   **Klasik** (elemen menyebar), **Rapat Kanan** (semua di sisi kanan),
-  **Judul Bawah** (gaya akademik modern), dan **Bersih** (hanya inti).
+  **Judul Bawah** (gaya akademik modern), **Bersih** (hanya inti), dan
+  **Kop Akademik** (lembar formal 2 kolom untuk laporan/studio).
+- **Preset "Kop Akademik" (formal)** — tata letak kop peta kartografi standar:
+  - Peta (±75%) berbingkai di kiri, panel informasi (±25%) di kanan
+  - **Graticule** lintang/bujur otomatis dengan label **DMS** (mis. `107°15'0"E`)
+    di keempat sisi frame; interval menyesuaikan zoom (0°10' pada skala kabupaten)
+  - **Skala batang** bergaya peta cetak (kotak hitam-putih berselang) + skala
+    numerik `1:xxx.xxx`, plus ikon mata angin
+  - **Diagram lokasi** (inset map): peta Leaflet kedua yang zoom-out, dengan
+    **kotak merah** yang mengikuti `getBounds()` peta utama secara real-time
+  - **Legenda otomatis** dari kategori unik yang dipakai fitur — lengkap dengan
+    **color picker per kategori** agar warna konsisten di peta & legenda
+  - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
+  - Semua teks berasal dari input user (generik, bisa untuk topik apa pun)
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
 - **Edit bentuk** ulang lewat alat Edit
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)
@@ -53,13 +66,15 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan 9 test
+# Jalankan test (19 test)
 npm test
 ```
 
 Test memverifikasi: peta dimuat tanpa error, gambar poligon & hitung luas, simpan atribut,
 daftar fitur, penyimpanan localStorage & pemulihan, ekspor GeoJSON, marker dengan koordinat,
-ganti peta dasar, tampilan & persistensi layout peta, serta ganti template layout.
+ganti peta dasar, tampilan & persistensi layout peta, ganti template layout, serta
+preset "Kop Akademik" (lembar 2 kolom, legenda otomatis 3 kategori + warna kustom,
+graticule/skala/kompas/inset, sinkronisasi bounding box, dan persistensi field kop).
 
 > Catatan: di beberapa environment headless, `localStorage` tidak bertahan setelah `reload()`.
 > Test pemulihan memakai `addInitScript` untuk menyimulasikan storage persisten.
@@ -84,6 +99,7 @@ ganti peta dasar, tampilan & persistensi layout peta, serta ganti template layou
 | [Leaflet.draw](https://leaflet.github.io/Leaflet.draw/) | Alat gambar |
 | [Turf.js](https://turfjs.org/) | Perhitungan geospasial (luas, keliling) |
 | [html2canvas](https://html2canvas.hertzen.com/) | Ekspor PNG |
+| Canvas 2D API (bawaan browser) | Graticule & label koordinat |
 | Nominatim (OpenStreetMap) | Pencarian lokasi |
 
 Tidak ada backend, tidak ada database, tidak ada pelacakan.
@@ -92,10 +108,17 @@ Tidak ada backend, tidak ada database, tidak ada pelacakan.
 
 ```
 .
-├── index.html          # Struktur halaman
-├── css/style.css       # Tampilan
-├── js/app.js           # Semua logika aplikasi
-├── test/app.test.js    # Test otomatis (Playwright)
+├── index.html              # Struktur halaman
+├── css/
+│   ├── style.css           # Tampilan editor
+│   ├── formal-sheet.css    # Lembar formal "Kop Akademik"
+│   └── print-layout.css    # Aturan cetak / PDF
+├── js/
+│   ├── app.js              # Logika utama aplikasi
+│   ├── formal-layout.js    # Graticule, skala batang, format DMS
+│   ├── formal-sheet.js     # Lembar 2 kolom, inset, legenda otomatis
+│   └── print-layout.js     # PaperLayout: ekspor PNG & cetak
+├── test/app.test.js        # Test otomatis (Playwright)
 └── README.md
 ```
 

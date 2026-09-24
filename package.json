@@ -4,7 +4,7 @@
   "description": "Web sederhana untuk membuat peta delinasi yang bisa digunakan siapa saja — terutama mahasiswa. Gambar poligon, garis, atau titik di atas peta, otomatis dapat luas & keliling, isi nama dan keterangan, lalu ekspor ke GeoJSON atau PNG untuk laporan/tugas.",
   "main": "index.html",
   "scripts": {
-    "test": "node node_modules/playwright/cli.js test",
+    "test": "node node_modules/@playwright/test/cli.js test",
     "start": "python3 -m http.server 8000"
   },
   "keywords": ["peta", "delinasi", "gis", "leaflet", "mahasiswa", "geojson"],

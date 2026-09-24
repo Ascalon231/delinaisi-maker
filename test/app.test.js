@@ -311,3 +311,255 @@ test('template layout: ganti template mengubah posisi elemen', async ({ page }) 
     JSON.parse(localStorage.getItem('delinaisi-maker-v1')).layout.tpl);
   expect(stored).toBe('klasik');
 });
+
+/* ============================================================
+   Preset ke-5: "Kop Akademik" / Formal
+   ============================================================ */
+
+// Helper: isi 3 fitur poligon dengan 3 kategori warna berbeda.
+async function seedThreeCategories(page) {
+  await page.evaluate(() => {
+    const mk = (lls, name, cat) => {
+      const layer = L.polygon(lls);
+      addFeature({ id: ++idSeq, layer, type: 'Polygon', name, category: cat, desc: '', measure: null }, false);
+    };
+    mk([[-6.90,107.58],[-6.90,107.62],[-6.94,107.62],[-6.94,107.58]], 'Kawasan A', 'batas_admin');
+    mk([[-6.95,107.60],[-6.95,107.64],[-6.99,107.64],[-6.99,107.60]], 'Kawasan B', 'wilayah_studi');
+    mk([[-6.86,107.62],[-6.86,107.66],[-6.90,107.66],[-6.90,107.62]], 'Kawasan C', 'perairan');
+    map.fitBounds(drawnItems.getBounds(), { padding: [30, 30] });
+  });
+  await page.waitForTimeout(500);
+}
+
+test('kop akademik: lembar 2 kolom tampil & preset lama tetap utuh', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Aktifkan preset ke-5
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1200);
+
+  // Lembar formal ada, peta utama pindah ke dalamnya
+  await expect(page.locator('.formal-sheet')).toHaveCount(1);
+  await expect(page.locator('.formal-sheet #map')).toHaveCount(1);
+
+  // Field kop muncul saat preset ini aktif
+  await expect(page.locator('#kop-fields')).not.toHaveClass(/hidden/);
+
+  // Panel kanan berada di sebelah kanan peta (2 kolom)
+  const mapBox = await page.locator('.fl-map-col').boundingBox();
+  const panelBox = await page.locator('.fl-panel').boundingBox();
+  expect(panelBox.x).toBeGreaterThan(mapBox.x + mapBox.width - 2);
+
+  // Balik ke preset lama -> lembar dilepas, peta kembali ke #map-wrap
+  await page.locator('[data-tpl="klasik"]').click();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.formal-sheet')).toHaveCount(0);
+  await expect(page.locator('#map-wrap > #map')).toHaveCount(1);
+  await expect(page.locator('#kop-fields')).toHaveClass(/hidden/);
+});
+
+test('kop akademik: legenda otomatis dari 3 kategori + warna kustom', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await seedThreeCategories(page);
+  await expect(page.locator('#feat-count')).toHaveText('3');
+
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1300);
+
+  // Legenda ter-generate otomatis: 3 kategori unik
+  await expect(page.locator('#fl-legend .fl-legend-item')).toHaveCount(3);
+  const labels = await page.locator('#fl-legend .fl-legend-label').allTextContents();
+  expect(labels).toContain('Batas Administrasi');
+  expect(labels).toContain('Wilayah Studi');
+  expect(labels).toContain('Perairan / Sungai');
+
+  // Warna legenda mengikuti warna kategori yang dipakai
+  const swatchColor = await page.evaluate(() => {
+    const row = Array.from(document.querySelectorAll('#fl-legend .fl-legend-item'))
+      .find(r => r.textContent.includes('Wilayah Studi'));
+    return getComputedStyle(row.querySelector('.fl-legend-swatch')).backgroundColor;
+  });
+  expect(swatchColor).toBe('rgb(42, 157, 143)'); // #2a9d8f bawaan
+
+  // Ubah warna lewat color picker -> legenda ikut berubah & tersimpan
+  await page.evaluate(() => {
+    const inp = document.querySelector('#cat-color-list input[data-cat="wilayah_studi"]');
+    inp.value = '#ff00aa';
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(500);
+
+  const newColor = await page.evaluate(() => {
+    const row = Array.from(document.querySelectorAll('#fl-legend .fl-legend-item'))
+      .find(r => r.textContent.includes('Wilayah Studi'));
+    return getComputedStyle(row.querySelector('.fl-legend-swatch')).backgroundColor;
+  });
+  expect(newColor).toBe('rgb(255, 0, 170)');
+
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('delinaisi-maker-v1')).catColors.wilayah_studi);
+  expect(stored).toBe('#ff00aa');
+});
+
+test('kop akademik: graticule, skala batang, kompas & diagram lokasi', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+
+  // Kanvas graticule terpasang & berukuran
+  const canvas = await page.evaluate(() => {
+    const c = document.querySelector('#fl-graticule');
+    return { w: c.width, h: c.height };
+  });
+  expect(canvas.w).toBeGreaterThan(100);
+  expect(canvas.h).toBeGreaterThan(100);
+
+  // Label koordinat berformat DMS (derajat-menit-detik + hemisphere)
+  const dms = await page.evaluate(() => [
+    FormalLayout.toDMS(107.25, false),
+    FormalLayout.toDMS(-6.9, true)
+  ]);
+  expect(dms[0]).toBe('107\u00B015\'0"E');
+  expect(dms[1]).toBe('6\u00B054\'0"S');
+
+  // Interval graticule menyesuaikan zoom (zoom kabupaten = 10 menit)
+  const interval = await page.evaluate(() => FormalLayout.intervalFor(10));
+  expect(interval).toBeCloseTo(1 / 6, 5);
+
+  // Skala: label numerik + skala batang bergaya alternating
+  await expect(page.locator('#fl-scale-label')).toContainText('SKALA: 1:');
+  expect(await page.locator('#fl-scalebar svg rect').count()).toBeGreaterThanOrEqual(4);
+  const fills = await page.locator('#fl-scalebar svg rect').evaluateAll(
+    els => els.map(e => e.getAttribute('fill')));
+  expect(fills).toContain('#111111');
+  expect(fills).toContain('#ffffff');
+  // Angka di bawah segmen, berawalan 0
+  const ticks = await page.locator('#fl-scalebar svg text').allTextContents();
+  expect(ticks[0]).toBe('0');
+
+  // Ikon mata angin
+  await expect(page.locator('.fl-compass svg')).toHaveCount(1);
+
+  // Inset map (instance Leaflet kedua) + atribusi basemap
+  await expect(page.locator('#fl-inset-map.leaflet-container')).toHaveCount(1);
+  await expect(page.locator('.fl-inset-attr')).toContainText('Esri');
+});
+
+test('kop akademik: bounding box inset mengikuti peta utama', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+
+  const boxA = await page.evaluate(() => {
+    const b = FormalSheet.insetMap.getBounds();
+    return [+b.getSouth().toFixed(4), +b.getWest().toFixed(4)];
+  });
+
+  // Geser & zoom peta utama
+  await page.evaluate(() => map.setView([-6.95, 107.62], 12, { animate: false }));
+  await page.waitForTimeout(900);
+
+  const boxB = await page.evaluate(() => {
+    const b = FormalSheet.insetMap.getBounds();
+    return [+b.getSouth().toFixed(4), +b.getWest().toFixed(4)];
+  });
+
+  // Kotak merah ikut berubah mengikuti cakupan peta utama
+  expect(boxA).not.toEqual(boxB);
+
+  // Inset selalu lebih lebar dari peta utama (zoom-out)
+  const wider = await page.evaluate(() => {
+    const m = map.getBounds(), i = FormalSheet.insetMap.getBounds();
+    return (i.getEast() - i.getWest()) > (m.getEast() - m.getWest());
+  });
+  expect(wider).toBe(true);
+});
+
+test('kop akademik: field kop & preset tersimpan setelah reload', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(900);
+
+  await page.locator('#layout-title').fill('PETA DELINASI WILAYAH STUDI');
+  await page.locator('#kop-programStudy').fill('Perencanaan Wilayah dan Kota');
+  await page.locator('#kop-institution').fill('Universitas Contoh');
+  await page.locator('#kop-activityTitle').fill('Studio Perencanaan Wilayah');
+  await page.locator('#kop-activityYear').fill('2025');
+  await page.locator('#kop-supervisorTitle').fill('Dosen Pembina Studio PWK');
+  await page.locator('#kop-mapmakerName').fill('Nama Mahasiswa');
+  await page.locator('#kop-mapmakerDegree').fill('S.T.');
+  await page.locator('#kop-sourceData').fill('Dinas Pekerjaan Umum');
+  await page.waitForTimeout(800);
+
+  // Teks ter-render di panel lembar formal
+  await expect(page.locator('#fl-kop-study')).toHaveText('Perencanaan Wilayah dan Kota');
+  await expect(page.locator('#fl-kop-inst')).toHaveText('Universitas Contoh');
+  await expect(page.locator('#fl-activity')).toContainText('Studio Perencanaan Wilayah');
+  await expect(page.locator('#fl-activity')).toContainText('2025');
+  await expect(page.locator('#fl-title')).toHaveText('PETA DELINASI WILAYAH STUDI');
+  await expect(page.locator('#fl-ref-projection')).toHaveText('Universal Transverse Mercator');
+  await expect(page.locator('#fl-ref-datum')).toHaveText('WGS 1984');
+  await expect(page.locator('#fl-sign-role')).toHaveText('Dosen Pembina Studio PWK');
+  await expect(page.locator('#fl-sign-name')).toContainText('Nama Mahasiswa');
+  await expect(page.locator('#fl-sign-name')).toContainText('S.T.');
+  await expect(page.locator('#fl-source')).toHaveText('Dinas Pekerjaan Umum');
+
+  // Simpan lalu pulihkan
+  const stored = await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1'));
+  const parsed = JSON.parse(stored);
+  expect(parsed.layout.tpl).toBe('formal');
+  expect(parsed.layout.kop.programStudy).toBe('Perencanaan Wilayah dan Kota');
+  expect(parsed.layout.kop.supervisorTitle).toBe('Dosen Pembina Studio PWK');
+
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d), stored);
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  // Preset formal & seluruh field kop pulih
+  await expect(page.locator('.formal-sheet')).toHaveCount(1);
+  await expect(page.locator('#kop-programStudy')).toHaveValue('Perencanaan Wilayah dan Kota');
+  await expect(page.locator('#kop-supervisorTitle')).toHaveValue('Dosen Pembina Studio PWK');
+  await expect(page.locator('#fl-title')).toHaveText('PETA DELINASI WILAYAH STUDI');
+});
+
+test('kop akademik: teks generik (tanpa topik hardcode) & ekspor tetap tersedia', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1000);
+
+  // Default generik: proyeksi/datum terisi, topik tidak di-hardcode
+  await expect(page.locator('#kop-projection')).toHaveValue('Universal Transverse Mercator');
+  await expect(page.locator('#kop-datum')).toHaveValue('WGS 1984');
+  const studyVal = await page.locator('#kop-programStudy').inputValue();
+  expect(studyVal).toBe('');
+
+  // Tanpa judul -> fallback netral, bukan nama topik tertentu
+  await expect(page.locator('#fl-title')).toHaveText('Peta Delinasi');
+
+  // Tombol ekspor masih berfungsi (PaperLayout tersedia)
+  const api = await page.evaluate(() => typeof PaperLayout);
+  expect(api).toBe('object');
+
+  // Preset lain tidak terpengaruh: 5 tombol preset ada
+  await expect(page.locator('#tpl-row button')).toHaveCount(5);
+});

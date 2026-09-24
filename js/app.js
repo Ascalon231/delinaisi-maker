@@ -9,16 +9,23 @@
 const STORE_KEY = 'delinaisi-maker-v1';
 
 // Jenis delinasi yang bisa dipilih, lengkap dengan warna peta.
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { id: 'batas_admin',      label: 'Batas Administrasi',      color: '#e63946' },
   { id: 'daerah_pemilihan', label: 'Daerah Pemilihan',        color: '#7b2cbf' },
   { id: 'wilayah_studi',    label: 'Wilayah Studi',           color: '#2a9d8f' },
-  { id: 'zona_rawan',       label: 'Zona Rawan Bencana',      color: '#e76f51' },
   { id: 'penggunaan_lahan', label: 'Penggunaan Lahan',        color: '#588157' },
   { id: 'jaringan_jalan',   label: 'Jaringan / Jalan',        color: '#457b9d' },
   { id: 'perairan',         label: 'Perairan / Sungai',       color: '#0096c7' },
   { id: 'lainnya',          label: 'Lainnya',                 color: '#6c757d' }
 ];
+
+// Salinan yang bisa diubah user (warna kustom per kategori) — disimpan di localStorage.
+let CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
+
+function setCategoryColor(id, color) {
+  const c = CATEGORIES.find(x => x.id === id);
+  if (c) c.color = color;
+}
 
 const TYPE_LABEL = {
   Marker: 'Titik', Polyline: 'Garis', Polygon: 'Poligon',
@@ -266,6 +273,8 @@ function renderList() {
   $('#feat-count').textContent = features.length;
   $('#feat-empty').style.display = features.length ? 'none' : '';
   updateLegend();
+  // Legenda lembar formal dibangun dari kategori unik -> ikut diperbarui.
+  if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
 
   features.forEach(f => {
     const color = catOf(f.category).color;
@@ -529,10 +538,19 @@ function setBasemap(id, skipSave) {
 }
 
 /* -------------------- Layout peta (judul, legenda, utara, kredit) ---------- */
+// Nilai awal field kop akademik (semua tetap bisa diubah user).
+const KOP_DEFAULTS = {
+  programStudy: '', institution: '',
+  activityTitle: '', activityYear: String(new Date().getFullYear()),
+  projection: 'Universal Transverse Mercator', zone: 'UTM 52S', datum: 'WGS 1984',
+  sourceData: '', supervisorTitle: '', mapmakerName: '', mapmakerDegree: ''
+};
+
 const layout = {
   title: '', author: '',
   showLegend: true, showNorth: true, showScale: true, showCredit: true,
-  tpl: 'klasik'
+  tpl: 'klasik',
+  kop: Object.assign({}, KOP_DEFAULTS)
 };
 
 // Template layout mengikuti konvensi QGIS/ArcGIS:
@@ -544,25 +562,51 @@ const TEMPLATES = {
   klasik: { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
   rapat:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
   modal:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
-  bersih: { showLegend: true,  showNorth: false, showScale: true,  showCredit: false }
+  bersih: { showLegend: true,  showNorth: false, showScale: true,  showCredit: false },
+  // Preset ke-5: lembar formal 2 kolom (peta + panel kop). Semua teks dari input user.
+  formal: { showLegend: false, showNorth: false, showScale: false, showCredit: false, formal: true }
 };
+
+// Preset yang memakai lembar formal (bukan overlay di atas peta).
+function isFormalTpl(id) { return !!(TEMPLATES[id] && TEMPLATES[id].formal); }
 
 function applyTemplate(id) {
   if (!TEMPLATES[id]) return;
+  const prev = layout.tpl;
   layout.tpl = id;
   const t = TEMPLATES[id];
-  layout.showLegend = t.showLegend;
-  layout.showNorth = t.showNorth;
-  layout.showScale = t.showScale;
-  layout.showCredit = t.showCredit;
+  // Preset formal (Kop Akademik) memakai lembar sendiri, bukan overlay.
+  if (!t.formal) {
+    layout.showLegend = t.showLegend;
+    layout.showNorth = t.showNorth;
+    layout.showScale = t.showScale;
+    layout.showCredit = t.showCredit;
+  }
 
-  $('#map-wrap').className = 'tpl-' + id + (layout.title.trim() ? ' has-title' : '');
+  const formal = !!t.formal;
+  const wrap = $('#map-wrap');
+  wrap.className = 'tpl-' + id + (!formal && layout.title.trim() ? ' has-title' : '');
   $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === id));
+
+  // Tampilkan/sembunyikan field kop
+  const kopFields = $('#kop-fields');
+  if (kopFields) kopFields.classList.toggle('hidden', !formal);
+
+  // Checkbox overlay tidak relevan di lembar formal
+  const togglesBox = $('.layout-toggles');
+  if (togglesBox) togglesBox.classList.toggle('hidden', formal);
 
   // Sinkronkan checkbox di panel
   const map = { showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
                 showScale: '#layout-show-scale', showCredit: '#layout-show-credit' };
   Object.keys(map).forEach(k => { if ($(map[k])) $(map[k]).checked = !!layout[k]; });
+
+  // Pasang / lepas lembar formal
+  if (formal) {
+    FormalSheet.activate();
+  } else if (prev !== id || !formal) {
+    FormalSheet.deactivate();
+  }
 
   updateLayout();
   save();
@@ -570,6 +614,8 @@ function applyTemplate(id) {
 
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni',
                 'Juli','Agustus','September','Oktober','November','Desember'];
+
+const KOP_FIELDS = ['programStudy', 'institution', 'activityTitle', 'activityYear', 'projection', 'zone', 'datum', 'sourceData', 'supervisorTitle', 'mapmakerName', 'mapmakerDegree'];
 
 function formatDateID(d) {
   return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
@@ -625,6 +671,8 @@ function updateLegend() {  const legendEl = $('#map-legend');
 }
 
 function updateLayout() {
+  const formal = isFormalTpl(layout.tpl);
+
   // Judul
   const titleEl = $('#map-title');
   titleEl.textContent = layout.title;
@@ -633,7 +681,11 @@ function updateLayout() {
   // Saat judul tampil, kotak pencarian digeser ke bawah (lihat css/style.css).
   // Pertahankan class template (tpl-*).
   const wrap = $('#map-wrap');
-  wrap.classList.toggle('has-title', hasTitle);
+  if (!formal) {
+    wrap.classList.toggle('has-title', hasTitle);
+  } else {
+    wrap.classList.remove('has-title');
+  }
   if (!wrap.className.match(/tpl-\w+/)) wrap.classList.add('tpl-' + (layout.tpl || 'klasik'));
 
   // Kredit (nama, tanggal, sumber data, sistem koordinat)
@@ -655,7 +707,12 @@ function updateLayout() {
   const scaleCtl = map.__scaleControl;
   if (scaleCtl) {
     const el = scaleCtl.getContainer();
-    if (el) el.style.display = layout.showScale ? '' : 'none';
+    if (el) el.style.display = (layout.showScale && !formal) ? '' : 'none';
+  }
+
+  // Lembar formal: segarkan isi panel (teks kop, legenda, skala, inset)
+  if (formal && typeof FormalSheet !== 'undefined') {
+    FormalSheet.scheduleRefresh();
   }
 }
 
@@ -670,6 +727,24 @@ function bindLayout() {
     updateLayout();
     save();
   });
+
+  // Tombol reset warna kategori
+  const resetBtn = $('#btn-cat-reset');
+  if (resetBtn) resetBtn.addEventListener('click', resetCategoryColors);
+
+  // Kop Akademik fields
+  KOP_FIELDS.forEach(field => {
+    const el = $(`#kop-${field}`);
+    if (el) {
+      el.addEventListener('input', (e) => {
+        layout.kop = layout.kop || {};
+        layout.kop[field] = e.target.value;
+        updateLayout();
+        save();
+      });
+    }
+  });
+
   const toggles = [
     ['#layout-show-legend', 'showLegend'],
     ['#layout-show-north', 'showNorth'],
@@ -688,6 +763,44 @@ function bindLayout() {
   $$('#tpl-row button').forEach(b => {
     b.addEventListener('click', () => applyTemplate(b.dataset.tpl));
   });
+}
+
+/* -------------------- Warna kategori (color picker) -------------------- */
+// Legenda formal di-generate dari kategori unik yang dipakai fitur, dengan
+// warna ini. Warna tersimpan di localStorage bersama data lain.
+function renderCategoryColors() {
+  const host = $('#cat-color-list');
+  if (!host) return;
+  host.innerHTML = '';
+  CATEGORIES.forEach(cat => {
+    const row = document.createElement('label');
+    row.className = 'cat-color-item';
+    row.dataset.cat = cat.id;
+    row.innerHTML =
+      '<span class="cat-color-name">' + esc(cat.label) + '</span>' +
+      '<input type="color" value="' + esc(cat.color) + '" ' +
+        'aria-label="Warna untuk ' + esc(cat.label) + '" data-cat="' + esc(cat.id) + '">';
+    const input = row.querySelector('input');
+    input.addEventListener('input', (e) => {
+      setCategoryColor(cat.id, e.target.value);
+      // Terapkan ulang ke semua fitur kategori ini.
+      features.forEach(f => { if (f.category === cat.id) applyStyle(f); });
+      renderList();
+      if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
+      save();
+    });
+    host.appendChild(row);
+  });
+}
+
+function resetCategoryColors() {
+  CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
+  features.forEach(f => applyStyle(f));
+  renderCategoryColors();
+  renderList();
+  if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
+  save();
+  toast('Warna kategori dikembalikan ke bawaan');
 }
 
 /* -------------------- Pencarian lokasi (Nominatim) -------------------- */
@@ -912,7 +1025,10 @@ function save() {
       layout: { title: layout.title, author: layout.author,
                 showLegend: layout.showLegend, showNorth: layout.showNorth,
                 showScale: layout.showScale, showCredit: layout.showCredit,
-                tpl: layout.tpl },
+                tpl: layout.tpl,
+                kop: Object.assign({}, layout.kop) },
+      // Warna kustom per kategori (nama kategori -> warna)
+      catColors: CATEGORIES.reduce((acc, c) => { acc[c.id] = c.color; return acc; }, {}),
       features: features.map(f => ({
         id: f.id, name: f.name, category: f.category, desc: f.desc, type: f.type,
         geometry: layerToGeometry(f.layer, f.type)
@@ -961,12 +1077,30 @@ function load() {
     Object.keys(tg).forEach(k => {
       const el = $(tg[k]); if (el) el.checked = !!layout[k];
     });
+    // Pulihkan field kop akademik
+    if (data.layout.kop) {
+      layout.kop = Object.assign({}, KOP_DEFAULTS, data.layout.kop);
+    }
+    KOP_FIELDS.forEach(field => {
+      const el = $('#kop-' + field);
+      if (el && layout.kop[field] != null) el.value = layout.kop[field];
+    });
+
     // Terapkan template layout yang tersimpan
     if (data.layout.tpl && TEMPLATES[data.layout.tpl]) {
       layout.tpl = data.layout.tpl;
       $('#map-wrap').classList.add('tpl-' + layout.tpl);
       $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === layout.tpl));
     }
+  }
+
+  // Pulihkan warna kategori kustom
+  if (data.catColors) {
+    Object.keys(data.catColors).forEach(catId => {
+      if (typeof data.catColors[catId] === 'string') {
+        setCategoryColor(catId, data.catColors[catId]);
+      }
+    });
   }
   (data.features || []).forEach(sf => {
     const type = sf.type || inferType(sf.geometry);
@@ -1122,8 +1256,8 @@ function init() {
 
   // ---- Ekspor / impor ----
   $('#btn-export-geojson').addEventListener('click', exportGeoJSON);
-  $('#btn-export-png').addEventListener('click', exportPNG);
-  $('#btn-print').addEventListener('click', () => window.print());
+  $('#btn-export-png').addEventListener('click', () => PaperLayout.open('png'));
+  $('#btn-print').addEventListener('click', () => PaperLayout.open('print'));
   const pickFile = () => $('#file-input').click();
   $('#btn-import').addEventListener('click', pickFile);
   $('#btn-import-empty').addEventListener('click', pickFile);
@@ -1224,11 +1358,17 @@ function init() {
 
   // ---- Layout peta ----
   bindLayout();
+  renderCategoryColors();
 
   // Pasang peta dasar default (tanpa save), lalu muat data lama.
   setBasemap(currentBasemap, true);
   load();
   updateLayout();
+
+  // Jika preset tersimpan adalah Kop Akademik, aktifkan lembarnya.
+  if (isFormalTpl(layout.tpl)) {
+    applyTemplate(layout.tpl);
+  }
 
   // ---- Tampilkan bantuan sekali ----
   const params = new URLSearchParams(location.search);

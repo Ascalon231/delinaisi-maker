@@ -14,6 +14,8 @@
         integrity="sha384-NZLkVuBRMEeB4VeZz27WwTRvlhec30biQ8Xx7zG7JJnkvEKRg5qi6BNbEXo9ydwv" crossorigin="">
 
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/print-layout.css">
+  <link rel="stylesheet" href="css/formal-sheet.css">
 </head>
 <body>
   <a class="skip-link" href="#map-wrap">Lewati ke peta</a>
@@ -111,6 +113,7 @@
           <button data-tpl="rapat" title="Semua elemen di sisi kanan (gaya ArcGIS minimal)">Rapat Kanan</button>
           <button data-tpl="modal" title="Judul di tengah-bawah, gaya peta akademik">Judul Bawah</button>
           <button data-tpl="bersih" title="Hanya inti: judul, legenda, skala">Bersih</button>
+          <button data-tpl="formal" title="Kop akademik: peta berbingkai + panel informasi (formal)">Kop Akademik</button>
         </div>
         <label class="field field-tight">
           <span>Judul peta</span>
@@ -126,7 +129,71 @@
           <label class="toggle"><input type="checkbox" id="layout-show-scale" checked><span>Skala</span></label>
           <label class="toggle"><input type="checkbox" id="layout-show-credit" checked><span>Kredit</span></label>
         </div>
-        <p class="hint">Elemen ini tampil di atas peta dan ikut tercetak saat ekspor PNG / cetak PDF.</p>
+        <p class="hint">Gaya di atas untuk editor. Gunakan lembar cetak untuk hasil peta akademik berbingkai.</p>
+
+        <!-- Field Kop Akademik (tampil hanya saat preset "Kop Akademik" aktif) -->
+        <div id="kop-fields" class="kop-fields hidden">
+          <p class="kop-fields-title">Data Kop Akademik</p>
+          <label class="field field-tight">
+            <span>Program Studi</span>
+            <input id="kop-programStudy" type="text" placeholder="mis. Perencanaan Wilayah dan Kota" maxlength="90">
+          </label>
+          <label class="field field-tight">
+            <span>Institusi</span>
+            <input id="kop-institution" type="text" placeholder="mis. Universitas Contoh" maxlength="90">
+          </label>
+          <label class="field field-tight">
+            <span>Nama Kegiatan / Studio</span>
+            <input id="kop-activityTitle" type="text" placeholder="mis. Studio Perencanaan Wilayah" maxlength="90">
+          </label>
+          <label class="field field-tight">
+            <span>Tahun Kegiatan</span>
+            <input id="kop-activityYear" type="text" placeholder="mis. 2025" maxlength="12">
+          </label>
+          <div class="kop-grid">
+            <label class="field field-tight">
+              <span>Proyeksi</span>
+              <input id="kop-projection" type="text" value="Universal Transverse Mercator" maxlength="60">
+            </label>
+            <label class="field field-tight">
+              <span>Zona</span>
+              <input id="kop-zone" type="text" value="UTM 52S" maxlength="30">
+            </label>
+          </div>
+          <label class="field field-tight">
+            <span>Datum</span>
+            <input id="kop-datum" type="text" value="WGS 1984" maxlength="40">
+          </label>
+          <label class="field field-tight">
+            <span>Sumber data</span>
+            <textarea id="kop-sourceData" rows="2" placeholder="mis. Dinas Pekerjaan Umum, citra satelit Esri" maxlength="400"></textarea>
+          </label>
+          <label class="field field-tight">
+            <span>Jabatan pembimbing</span>
+            <input id="kop-supervisorTitle" type="text" placeholder="mis. Dosen Pembina Studio PWK" maxlength="90">
+          </label>
+          <div class="kop-grid">
+            <label class="field field-tight">
+              <span>Nama pembuat peta</span>
+              <input id="kop-mapmakerName" type="text" placeholder="mis. Nama Mahasiswa" maxlength="90">
+            </label>
+            <label class="field field-tight">
+              <span>Gelar</span>
+              <input id="kop-mapmakerDegree" type="text" placeholder="mis. S.T." maxlength="30">
+            </label>
+          </div>
+        </div>
+        <button id="btn-paper-preview" class="btn btn-primary paper-open">Layout siap cetak</button>
+        <p class="hint">A4, A3, F4, Letter · Tegak / mendatar · PNG / PDF</p>
+      </section>
+
+      <section class="card" id="cat-color-card">
+        <div class="card-head">
+          <h2>Warna kategori</h2>
+          <button id="btn-cat-reset" class="btn btn-secondary btn-sm" title="Kembalikan warna bawaan">Reset</button>
+        </div>
+        <p class="hint">Warna ini dipakai di peta dan legenda. Ubah agar tiap jenis delinasi punya warna konsisten.</p>
+        <div id="cat-color-list" class="cat-color-list"></div>
       </section>
 
       <section class="card card-flex">
@@ -263,5 +330,8 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <script src="js/app.js"></script>
+  <script src="js/formal-layout.js"></script>
+  <script src="js/formal-sheet.js"></script>
+  <script src="js/print-layout.js"></script>
 </body>
 </html>
