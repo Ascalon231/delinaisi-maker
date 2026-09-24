@@ -37,6 +37,9 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
     peringatan bila dua kategori berwarna sama, serta kategori bisa
     **ditambah, diganti nama, dan dihapus** — semuanya tersimpan otomatis
   - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
+  - **Logo instansi bisa diunggah** (PNG/JPG/SVG/WebP, maks 1 MB) —
+    otomatis diperkecil & disimpan di browser, jadi kop memakai logo
+    kampus/instansi asli, bukan ikon bawaan
   - Semua teks berasal dari input user (generik, bisa untuk topik apa pun)
 - **8 peta dasar, semuanya gratis & tanpa API key**: Peta Jalan (OpenStreetMap),
   Satelit (Esri), **Relief** (Esri Topo — bentuk lahan), **Topografi**
@@ -84,7 +87,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (34 test)
+# Jalankan test (41 test)
 npm test
 ```
 
