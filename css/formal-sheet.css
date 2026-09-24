@@ -66,7 +66,7 @@
 .fl-graticule-canvas {
   position: absolute;
   inset: 0;
-  z-index: 450;
+  z-index: var(--z-graticule);
   pointer-events: none;
 }
 
@@ -74,7 +74,7 @@
 .fl-map-host {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: var(--z-map-base);
 }
 
 /* ---------- Kolom panel informasi ---------- */
@@ -164,7 +164,7 @@
 }
 .fl-inset-map { position: absolute; inset: 0; }
 .fl-inset-attr {
-  position: absolute; right: 0; bottom: 0; z-index: 500;
+  position: absolute; right: 0; bottom: 0; z-index: var(--z-attribution);
   /* Cukup pekat agar teks 7px terbaca, tapi tidak menutupi peta inset. */
   background: rgba(255,255,255,.78);
   font-family: sans-serif;
@@ -175,7 +175,7 @@
 }
 /* Grid koordinat pada inset */
 .fl-inset-graticule {
-  position: absolute; inset: 0; z-index: 450;
+  position: absolute; inset: 0; z-index: var(--z-graticule);
   pointer-events: none;
 }
 

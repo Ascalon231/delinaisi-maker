@@ -2302,3 +2302,126 @@ test('shortcut: tombol huruf tidak mengganggu saat mengetik di kolom teks', asyn
   await page.keyboard.press('Escape');
   await page.waitForTimeout(300);
 });
+
+/* ============================================================
+   Kualitas tampilan: token desain, meta, favicon
+   ============================================================ */
+
+test('desain: favicon & meta sosial terpasang', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+
+  const meta = await page.evaluate(() => ({
+    icon: !!document.querySelector('link[rel="icon"]'),
+    apple: !!document.querySelector('link[rel="apple-touch-icon"]'),
+    ogTitle: (document.querySelector('meta[property="og:title"]') || {}).content || '',
+    ogDesc: (document.querySelector('meta[property="og:description"]') || {}).content || '',
+    ogType: (document.querySelector('meta[property="og:type"]') || {}).content || '',
+    theme: (document.querySelector('meta[name="theme-color"]') || {}).content || '',
+    desc: (document.querySelector('meta[name="description"]') || {}).content || '',
+    title: document.title
+  }));
+
+  expect(meta.icon).toBe(true);
+  expect(meta.apple).toBe(true);
+  expect(meta.ogTitle).toContain('Delinaisi Maker');
+  expect(meta.ogDesc.length).toBeGreaterThan(40);
+  expect(meta.ogType).toBe('website');
+  expect(meta.theme).toMatch(/^#[0-9a-f]{6}$/i);
+  expect(meta.desc).toContain('delinasi');
+  expect(meta.title).toContain('Delinaisi Maker');
+
+  // Favicon berupa SVG data URI (tanpa berkas tambahan)
+  const href = await page.locator('link[rel="icon"]').getAttribute('href');
+  expect(href).toContain('data:image/svg+xml');
+});
+
+test('desain: token z-index & radius dipakai konsisten', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(800);
+
+  // Token terdefinisi
+  const token = await page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    const ambil = k => cs.getPropertyValue(k).trim();
+    return {
+      rXs: ambil('--r-xs'), rSm: ambil('--r-sm'), rMd: ambil('--r-md'),
+      rLg: ambil('--r-lg'), rPill: ambil('--r-pill'),
+      zHeader: ambil('--z-header'), zModal: ambil('--z-modal'),
+      zToast: ambil('--z-toast'), zDrawer: ambil('--z-drawer')
+    };
+  });
+  Object.values(token).forEach(v => expect(v).not.toBe(''));
+
+  // Urutan lapisan masuk akal: drawer < header < modal < toast
+  const num = v => parseInt(v, 10);
+  expect(num(token.zDrawer)).toBeLessThan(num(token.zHeader));
+  expect(num(token.zHeader)).toBeLessThan(num(token.zModal));
+  expect(num(token.zModal)).toBeLessThan(num(token.zToast));
+
+  // Radius komponen konsisten (tombol/alat/input memakai skala yang sama)
+  const r = await page.evaluate(() => {
+    const g = s => getComputedStyle(document.querySelector(s)).borderRadius;
+    return { btn: g('.btn'), tool: g('.tool'), input: g('.field input'), card: g('.card') };
+  });
+  expect(r.btn).toBe(r.tool);
+  expect(r.btn).toBe(r.input);
+  // Wadah (kartu) lebih membulat daripada komponen di dalamnya
+  expect(parseInt(r.card, 10)).toBeGreaterThan(parseInt(r.btn, 10));
+});
+
+test('desain: layout memakai dvh agar tidak melompat di mobile', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(600);
+
+  // Baca berkas dari disk (fetch diblokir pada protokol file://),
+  // lalu pastikan dvh dipakai DENGAN fallback vh untuk browser lama.
+  const cssTeks = require('fs').readFileSync(
+    path.join(__dirname, '..', 'css', 'style.css'), 'utf-8');
+  expect(cssTeks).toMatch(/100dvh/);
+  expect(cssTeks).toMatch(/height:\s*calc\(100vh/);   // fallback
+
+  // Pada browser yang mendukung, tinggi #app benar-benar terhitung
+  expect(await page.evaluate(() => CSS.supports('height', '100dvh'))).toBe(true);
+  const tinggi = await page.evaluate(() =>
+    parseInt(getComputedStyle(document.querySelector('#app')).height, 10));
+  expect(tinggi).toBeGreaterThan(100);
+});
+
+test('desain: focus ring tetap terlihat di atas header biru', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(600);
+
+  // Outline putih untuk kontrol di header (biru), karena outline biru
+  // di atas latar biru hampir tidak terlihat.
+  const warna = await page.evaluate(() => {
+    const hasil = {};
+    ['#btn-undo', '#btn-redo'].forEach(sel => {
+      const el = document.querySelector(sel);
+      el.focus();
+      hasil[sel] = getComputedStyle(el).outlineColor;
+    });
+    return hasil;
+  });
+  Object.values(warna).forEach(c => expect(c).toBe('rgb(255, 255, 255)'));
+});
+
+test('desain: placeholder & pesan memakai contoh nyata, bukan generik', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(600);
+
+  const ph = await page.evaluate(() => Array.from(document.querySelectorAll('[placeholder]'))
+    .map(e => e.getAttribute('placeholder')));
+
+  // Tidak ada placeholder bergaya template
+  const terlarang = /lorem|john doe|jane smith|acme|nexus|company name|foo|bar/i;
+  ph.forEach(t => expect(t).not.toMatch(terlarang));
+
+  // Contoh spesifik & realistis
+  expect(ph.join(' | ')).toContain('Hasanuddin');
+  expect(ph.join(' | ')).toContain('Rahmat Hidayat');
+});

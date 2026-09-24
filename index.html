@@ -4,7 +4,20 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Delinaisi Maker — Buat Peta Delinasi di Browser</title>
-  <meta name="description" content="Web sederhana untuk membuat peta delinasi: gambar poligon, garis, dan titik di peta, hitung luas & keliling, lalu ekspor ke GeoJSON atau PNG. Gratis, tanpa login.">
+  <!-- Ikon tab: peta terlipat. SVG data URI agar tanpa berkas tambahan. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6fed'/%3E%3Cpath d='M7 10l5-2 8 3 5-2v14l-5 2-8-3-5 2z' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M12 8v14M20 11v14' stroke='%23fff' stroke-width='1.6' opacity='.55'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232f6fed'/%3E%3Cpath d='M7 10l5-2 8 3 5-2v14l-5 2-8-3-5 2z' fill='none' stroke='%23fff' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <!-- Pratinjau saat tautan dibagikan (WhatsApp, dosen, grup kelas) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Delinaisi Maker — Buat Peta Delinasi di Browser">
+  <meta property="og:description" content="Gambar poligon, garis, dan titik di peta; luas & keliling dihitung otomatis; ekspor ke GeoJSON, CSV, PNG, atau PDF siap laporan. Gratis, tanpa login.">
+  <meta property="og:locale" content="id_ID">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Delinaisi Maker">
+  <meta name="twitter:description" content="Buat peta delinasi langsung di browser — gratis, tanpa login.">
+  <meta name="theme-color" content="#2f6fed">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Web sederhana untuk membuat peta delinasi: gambar poligon, garis, dan titik di peta, hitung luas & keliling otomatis, muat batas administrasi, lalu ekspor ke GeoJSON, CSV, PNG, atau PDF siap laporan. Gratis, tanpa login.">
 
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -168,11 +181,11 @@
         </div>
         <label class="field field-tight">
           <span>Judul peta</span>
-          <input id="layout-title" type="text" placeholder="mis. Peta Delinasi Wilayah Studi Kampus" maxlength="90">
+          <input id="layout-title" type="text" placeholder="mis. Peta Delinasi Zona Industri Pesisir" maxlength="90">
         </label>
         <label class="field field-tight">
           <span>Dibuat oleh</span>
-          <input id="layout-author" type="text" placeholder="mis. Budi, Mahasiswa Geografi" maxlength="60">
+          <input id="layout-author" type="text" placeholder="mis. Sari Puspita, Mahasiswa PWK" maxlength="60">
         </label>
         <div class="layout-toggles">
           <label class="toggle"><input type="checkbox" id="layout-show-legend" checked><span>Legenda</span></label>
@@ -192,11 +205,11 @@
           </label>
           <label class="field field-tight">
             <span>Institusi</span>
-            <input id="kop-institution" type="text" placeholder="mis. Universitas Contoh" maxlength="90">
+            <input id="kop-institution" type="text" placeholder="mis. Universitas Hasanuddin" maxlength="90">
           </label>
           <label class="field field-tight">
             <span>Nama Kegiatan / Studio</span>
-            <input id="kop-activityTitle" type="text" placeholder="mis. Studio Perencanaan Wilayah" maxlength="90">
+            <input id="kop-activityTitle" type="text" placeholder="mis. Studio Perencanaan Wilayah 2025" maxlength="90">
           </label>
           <label class="field field-tight">
             <span>Tahun Kegiatan</span>
@@ -218,7 +231,7 @@
           </label>
           <label class="field field-tight">
             <span>Sumber data</span>
-            <textarea id="kop-sourceData" rows="2" placeholder="mis. Dinas Pekerjaan Umum, citra satelit Esri" maxlength="400"></textarea>
+            <textarea id="kop-sourceData" rows="2" placeholder="mis. Dinas PUPR Kab. Bogor; citra Esri 2024" maxlength="400"></textarea>
           </label>
           <label class="field field-tight">
             <span>Jabatan pembimbing</span>
@@ -297,7 +310,7 @@
           <div class="kop-grid">
             <label class="field field-tight">
               <span>Nama pembuat peta</span>
-              <input id="kop-mapmakerName" type="text" placeholder="mis. Nama Mahasiswa" maxlength="90">
+              <input id="kop-mapmakerName" type="text" placeholder="mis. Rahmat Hidayat" maxlength="90">
             </label>
             <label class="field field-tight">
               <span>Gelar</span>
@@ -412,7 +425,7 @@
       <h2 id="modal-title">Detail fitur</h2>
       <label class="field">
         <span>Nama fitur</span>
-        <input id="attr-name" type="text" placeholder="mis. Batas Kel Sukamaju" maxlength="80">
+        <input id="attr-name" type="text" placeholder="mis. Batas Kelurahan Sukamaju" maxlength="80">
       </label>
       <label class="field">
         <span>Jenis delinasi</span>

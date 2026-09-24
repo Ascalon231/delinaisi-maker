@@ -102,7 +102,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (63 test)
+# Jalankan test (68 test)
 npm test
 ```
 
@@ -136,6 +136,7 @@ graticule/skala/kompas/inset, sinkronisasi bounding box, dan persistensi field k
 | [Turf.js](https://turfjs.org/) | Perhitungan geospasial (luas, keliling) |
 | [html2canvas](https://html2canvas.hertzen.com/) | Ekspor PNG |
 | Canvas 2D API (bawaan browser) | Graticule & label koordinat |
+| Vanilla CSS + token desain | Warna, radius, z-index, dan tipografi terpusat |
 | Nominatim (OpenStreetMap) | Pencarian lokasi + batas administrasi |
 
 Tidak ada backend, tidak ada database, tidak ada pelacakan.
