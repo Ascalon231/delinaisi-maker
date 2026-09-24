@@ -37,6 +37,10 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
     peringatan bila dua kategori berwarna sama, serta kategori bisa
     **ditambah, diganti nama, dan dihapus** — semuanya tersimpan otomatis
   - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
+  - **Diagram lokasi bisa dikustom**: pilih peta dasarnya (Minimal / Jalan /
+    Relief / Satelit / Gelap / ikut peta utama), perbesaran zoom-out
+    (negara s.d. kabupaten), tinggi kotak, warna kotak cakupan, tampil atau
+    tidaknya grid koordinat, dan judulnya sendiri
   - **Logo instansi bisa diunggah** (PNG/JPG/SVG/WebP, maks 1 MB) —
     otomatis diperkecil & disimpan di browser, jadi kop memakai logo
     kampus/instansi asli, bukan ikon bawaan
@@ -87,7 +91,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (41 test)
+# Jalankan test (48 test)
 npm test
 ```
 
