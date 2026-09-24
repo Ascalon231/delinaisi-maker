@@ -341,6 +341,60 @@ function markerIcon(color) {
   });
 }
 
+// Label permanen berisi nama fitur, ditampilkan di atas peta (bukan hanya
+// di popup). Ini kebutuhan dasar peta delinasi: kawasan tanpa nama tidak
+// berguna di laporan. Bisa dimatikan lewat toggle "Nama fitur di peta".
+function applyLabel(f) {
+  if (!f.layer || typeof f.layer.bindTooltip !== 'function') return;
+  const show = layout.showLabels !== false;
+  const nama = (f.name || '').trim();
+  const sudahAda = f.__labelBound;
+
+  // Lepas label lama bila nama berubah atau label dimatikan.
+  // Catatan: unbindTooltip() Leaflet TIDAK selalu membuang elemen tooltip
+  // permanen dari DOM, jadi elemennya dihapus manual. Tanpa ini, toggle
+  // "Nama fitur di peta" terlihat tidak berfungsi.
+  function buangElemenLabel(layer) {
+    const t = layer.getTooltip && layer.getTooltip();
+    if (t && t._container && t._container.parentNode) {
+      t._container.parentNode.removeChild(t._container);
+    }
+  }
+
+  if (sudahAda) {
+    try { f.layer.closeTooltip(); } catch (e) {}
+    try { buangElemenLabel(f.layer); } catch (e) {}
+    try { f.layer.unbindTooltip(); } catch (e) {}
+    f.__labelBound = false;
+  }
+  if (!show || !nama) return;
+
+  try {
+    f.layer.bindTooltip(nama, {
+      permanent: true,
+      direction: 'center',
+      className: 'dm-feature-label' + (f.type === 'Marker' ? ' dm-label-point' : ''),
+      opacity: 1
+    });
+    f.__labelBound = true;
+  } catch (e) { /* diabaikan */ }
+}
+
+// Terapkan label ke semua fitur (dipakai saat toggle diubah).
+function refreshAllLabels() {
+  features.forEach(applyLabel);
+  // Sapu bersih: buang elemen label yang tidak lagi punya pemilik.
+  const pane = document.querySelector('#map .leaflet-tooltip-pane');
+  if (pane) {
+    Array.from(pane.querySelectorAll('.dm-feature-label')).forEach(el => {
+      const teks = (el.textContent || '').trim();
+      const masihDipakai = (layout.showLabels !== false) && features.some(f =>
+        f.__labelBound && (f.name || '').trim() === teks);
+      if (!masihDipakai) el.remove();
+    });
+  }
+}
+
 function applyStyle(f) {
   const color = catOf(f.category).color;
   if (f.type === 'Marker') {
@@ -350,6 +404,8 @@ function applyStyle(f) {
   }
   // Halo putih menjaga keterbacaan di atas basemap gelap.
   applyHalo(f, color);
+  // Label nama fitur.
+  applyLabel(f);
 }
 
 /* -------------------- Popup -------------------- */
@@ -383,6 +439,7 @@ function renderList() {
   $('#feat-count').textContent = features.length;
   $('#feat-empty').style.display = features.length ? 'none' : '';
   updateLegend();
+  refreshAllLabels();
   // Hitungan "n fitur" dan tombol hapus di panel warna ikut berubah.
   if (typeof renderCategoryColors === 'function') renderCategoryColors();
   // Legenda lembar formal dibangun dari kategori unik -> ikut diperbarui.
@@ -707,6 +764,8 @@ const KOP_DEFAULTS = {
 const layout = {
   title: '', author: '',
   showLegend: true, showNorth: true, showScale: true, showCredit: true,
+  // Nama fitur ditampilkan di peta (label permanen), bukan hanya di popup.
+  showLabels: true,
   tpl: 'klasik',
   kop: Object.assign({}, KOP_DEFAULTS)
 };
@@ -717,12 +776,13 @@ const layout = {
 // - modal:  judul di tengah-bawah (gaya peta akademik modern)
 // - bersih: hanya judul + legenda + skala
 const TEMPLATES = {
-  klasik: { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
-  rapat:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
-  modal:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true  },
-  bersih: { showLegend: true,  showNorth: false, showScale: true,  showCredit: false },
+  klasik: { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true,  showLabels: true  },
+  rapat:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true,  showLabels: true  },
+  modal:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true,  showLabels: true  },
+  // Bersih: tanpa label agar peta benar-benar bersih.
+  bersih: { showLegend: true,  showNorth: false, showScale: true,  showCredit: false, showLabels: false },
   // Preset ke-5: lembar formal 2 kolom (peta + panel kop). Semua teks dari input user.
-  formal: { showLegend: false, showNorth: false, showScale: false, showCredit: false, formal: true }
+  formal: { showLegend: false, showNorth: false, showScale: false, showCredit: false, showLabels: true, formal: true }
 };
 
 // Preset yang memakai lembar formal (bukan overlay di atas peta).
@@ -749,6 +809,7 @@ function applyTemplate(id) {
     layout.showNorth = t.showNorth;
     layout.showScale = t.showScale;
     layout.showCredit = t.showCredit;
+    layout.showLabels = t.showLabels !== false;
   }
 
   const formal = !!t.formal;
@@ -767,8 +828,10 @@ function applyTemplate(id) {
 
   // Sinkronkan checkbox di panel
   const map = { showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
-                showScale: '#layout-show-scale', showCredit: '#layout-show-credit' };
+                showScale: '#layout-show-scale', showCredit: '#layout-show-credit',
+                showLabels: '#layout-show-labels' };
   Object.keys(map).forEach(k => { if ($(map[k])) $(map[k]).checked = !!layout[k]; });
+  refreshAllLabels();
 
   // Pasang / lepas lembar formal
   if (formal) {
@@ -963,11 +1026,16 @@ function bindLayout() {
     ['#layout-show-legend', 'showLegend'],
     ['#layout-show-north', 'showNorth'],
     ['#layout-show-scale', 'showScale'],
-    ['#layout-show-credit', 'showCredit']
+    ['#layout-show-credit', 'showCredit'],
+    ['#layout-show-labels', 'showLabels']
   ];
   toggles.forEach(([sel, key]) => {
-    $(sel).addEventListener('change', (e) => {
+    const el = $(sel);
+    if (!el) return;
+    el.addEventListener('change', (e) => {
       layout[key] = e.target.checked;
+      // Label perlu dipasang/dilepas langsung di tiap fitur.
+      if (key === 'showLabels') refreshAllLabels();
       updateLayout();
       save();
     });
@@ -1574,6 +1642,15 @@ function geometryToLayer(g, type, category) {
   }
 }
 
+// Ambil nilai pertama yang ada dari beberapa kemungkinan nama properti.
+function pickProp(obj, keys) {
+  for (const k of keys) {
+    const v = obj[k];
+    if (v != null && String(v).trim() !== '') return v;
+  }
+  return null;
+}
+
 function inferType(g) {
   if (!g || !g.type) return null;
   if (g.type === 'Point') return (g.radius != null) ? 'Circle' : 'Marker';
@@ -1582,10 +1659,83 @@ function inferType(g) {
   return null;
 }
 
+// Pulihkan pengaturan proyek dari berkas GeoJSON yang kita ekspor sendiri.
+// Tanpa ini, mengimpor kembali berkas hasil ekspor akan kehilangan kop,
+// preset layout, warna kategori, dan posisi peta.
+function restoreProject(proj) {
+  if (!proj || typeof proj !== 'object') return false;
+  let dipulihkan = false;
+
+  if (Array.isArray(proj.categories) && proj.categories.length) {
+    CATEGORIES = proj.categories
+      .filter(c => c && typeof c.id === 'string')
+      .map(c => ({
+        id: c.id,
+        label: (typeof c.label === 'string' && c.label.trim()) ? c.label : c.id,
+        color: normalizeHex(c.color) || '#6c757d'
+      }));
+    if (!CATEGORIES.length) CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
+    dipulihkan = true;
+  }
+
+  const L2 = proj.layout;
+  if (L2 && typeof L2 === 'object') {
+    layout.title = L2.title || '';
+    layout.author = L2.author || '';
+    layout.showLegend = L2.showLegend !== false;
+    layout.showNorth = L2.showNorth !== false;
+    layout.showScale = L2.showScale !== false;
+    layout.showCredit = L2.showCredit !== false;
+    layout.showLabels = L2.showLabels !== false;
+    layout.kop = Object.assign({}, KOP_DEFAULTS, L2.kop || {});
+    dipulihkan = true;
+  }
+
+  if (proj.basemap && BASEMAPS[proj.basemap]) {
+    setBasemap(proj.basemap, true);
+  }
+  if (proj.view) {
+    try { map.setView([proj.view.lat, proj.view.lng], proj.view.zoom); } catch (e) {}
+  }
+
+  // Terapkan preset terakhir (termasuk lembar formal bila itu yang dipakai).
+  const tpl = (proj.tpl && TEMPLATES[proj.tpl]) ? proj.tpl : null;
+
+  // Sinkronkan kontrol panel dengan state yang baru dipulihkan.
+  const t = $('#layout-title'); if (t) t.value = layout.title;
+  const a = $('#layout-author'); if (a) a.value = layout.author;
+  KOP_FIELDS.forEach(({ field, id }) => {
+    const el = $('#' + id);
+    if (el && layout.kop[field] != null) el.value = layout.kop[field];
+  });
+  const showEl = $('#kop-inset-show');
+  if (showEl) showEl.checked = layout.kop.insetShow !== false;
+  renderLogoPreview();
+
+  if (tpl) {
+    applyTemplate(tpl);
+  } else {
+    const tg = {
+      showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
+      showScale: '#layout-show-scale', showCredit: '#layout-show-credit',
+      showLabels: '#layout-show-labels'
+    };
+    Object.keys(tg).forEach(k => { const el = $(tg[k]); if (el) el.checked = !!layout[k]; });
+    refreshAllLabels();
+  }
+
+  renderCategoryColors();
+  renderCategorySelect();
+  return dipulihkan;
+}
+
 function importGeoJSON(text) {
   let data;
   try { data = JSON.parse(text); }
   catch (e) { toast('File GeoJSON tidak valid'); return; }
+
+  // Berkas hasil ekspor aplikasi ini membawa pengaturan proyek lengkap.
+  const adaProyek = restoreProject(data.project);
 
   const feats = (data.type === 'FeatureCollection') ? (data.features || [])
     : (data.type === 'Feature') ? [data]
@@ -1605,9 +1755,13 @@ function importGeoJSON(text) {
     if (!layer) return;
     addFeature({
       id: ++idSeq, layer, type,
-      name: String(p.name || p.Nama || '').slice(0, 80),
+      // Nama dari berbagai penamaan umum (QGIS/ArcGIS/kita sendiri) agar
+      // data dari aplikasi lain tidak kehilangan atributnya.
+      name: String(pickProp(p, ['name', 'Nama', 'NAMA', 'NAME', 'nama',
+        'label', 'Label', 'judul', 'title', 'Title']) || '').slice(0, 80),
       category,
-      desc: String(p.description || p.desc || p.keterangan || '').slice(0, 400),
+      desc: String(pickProp(p, ['description', 'desc', 'keterangan',
+        'KETERANGAN', 'Keterangan', 'remark', 'note']) || '').slice(0, 400),
       measure: null
     }, false);
     n++;
@@ -1615,10 +1769,14 @@ function importGeoJSON(text) {
 
   save();
   if (n) {
-    toast(n + ' fitur berhasil diimpor');
-    map.fitBounds(drawnItems.getBounds(), { padding: [40, 40], maxZoom: 16 });
+    toast(n + ' fitur diimpor' + (adaProyek ? ' + pengaturan proyek dipulihkan' : ''));
+    // Bila proyek membawa posisi peta sendiri, jangan paksa zoom ke fitur.
+    if (!adaProyek) {
+      map.fitBounds(drawnItems.getBounds(), { padding: [40, 40], maxZoom: 16 });
+    }
   } else {
-    toast('Tidak ada geometri yang bisa dibaca');
+    toast(adaProyek ? 'Pengaturan proyek dipulihkan (tanpa geometri)'
+                    : 'Tidak ada geometri yang bisa dibaca');
   }
 }
 
@@ -1635,6 +1793,24 @@ function exportGeoJSON() {
       date: new Date().toISOString().slice(0, 10),
       datasource: basemapAttribution(currentBasemap),
       crs: 'WGS 84 (EPSG:4326)'
+    },
+    // Seluruh pengaturan proyek ikut disimpan supaya berkas ini bisa
+    // dipakai untuk melanjutkan pekerjaan (bukan sekadar geometri).
+    // Sebelumnya hanya title & author; kop, preset, warna kategori, dan
+    // pengaturan peta hilang saat diimpor kembali.
+    project: {
+      v: 1,
+      tpl: layout.tpl,
+      layout: {
+        title: layout.title, author: layout.author,
+        showLegend: layout.showLegend, showNorth: layout.showNorth,
+        showScale: layout.showScale, showCredit: layout.showCredit,
+        showLabels: layout.showLabels,
+        kop: Object.assign({}, layout.kop)
+      },
+      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color })),
+      basemap: currentBasemap,
+      view: { lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() }
     },
     features: features.map(f => {
       let geometry;
@@ -1668,6 +1844,54 @@ function exportGeoJSON() {
   const blob = new Blob([JSON.stringify(fc, null, 2)], { type: 'application/geo+json' });
   downloadBlob(blob, 'peta-delinasi.geojson');
   toast(features.length + ' fitur diekspor ke GeoJSON');
+}
+
+// Ekspor tabel atribut untuk lampiran laporan. Memakai pemisah ';' dan
+// koma desimal gaya Indonesia supaya langsung rapi di Excel berbahasa ID.
+function exportCSV() {
+  if (!features.length) { toast('Belum ada fitur untuk diekspor'); return; }
+
+  const head = ['No', 'Nama', 'Jenis Delinasi', 'Tipe', 'Keterangan',
+    'Luas (m2)', 'Luas (ha)', 'Keliling (m)', 'Panjang (m)', 'Radius (m)',
+    'Latitude', 'Longitude'];
+
+  const num = (v, desimal) => (v == null || !isFinite(v))
+    ? '' : v.toFixed(desimal == null ? 2 : desimal).replace('.', ',');
+
+  const baris = features.map((f, i) => {
+    const m = f.measure || {};
+    const cat = catOf(f.category);
+    let lat = '', lng = '';
+    try {
+      const c = f.type === 'Marker' ? f.layer.getLatLng()
+        : (f.type === 'Circle' ? f.layer.getLatLng() : f.layer.getBounds().getCenter());
+      lat = num(c.lat, 6); lng = num(c.lng, 6);
+    } catch (e) { /* biarkan kosong */ }
+    return [
+      i + 1,
+      f.name || '',
+      cat.label,
+      TYPE_LABEL[f.type] || f.type,
+      f.desc || '',
+      m.area != null ? num(m.area) : '',
+      m.area != null ? num(m.area / 10000, 4) : '',
+      m.perimeter != null ? num(m.perimeter) : '',
+      m.length != null ? num(m.length) : '',
+      m.radius != null ? num(m.radius) : '',
+      lat, lng
+    ];
+  });
+
+  const csvCell = (v) => {
+    const t = String(v == null ? '' : v);
+    return /[";\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  };
+  const isi = [head].concat(baris).map(r => r.map(csvCell).join(';')).join('\r\n');
+
+  // BOM agar Excel membaca UTF-8 dengan benar (nama beraksen/karakter khusus).
+  const blob = new Blob(['\uFEFF' + isi], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, 'tabel-delinasi.csv');
+  toast(features.length + ' baris diekspor ke CSV');
 }
 
 function downloadBlob(blob, filename) {
@@ -1729,6 +1953,7 @@ function save() {
       layout: { title: layout.title, author: layout.author,
                 showLegend: layout.showLegend, showNorth: layout.showNorth,
                 showScale: layout.showScale, showCredit: layout.showCredit,
+                showLabels: layout.showLabels,
                 tpl: layout.tpl,
                 kop: Object.assign({}, layout.kop) },
       // Daftar kategori lengkap: warna + nama kustom + kategori tambahan user.
@@ -1773,11 +1998,13 @@ function load() {
     layout.showNorth = data.layout.showNorth !== false;
     layout.showScale = data.layout.showScale !== false;
     layout.showCredit = data.layout.showCredit !== false;
+    layout.showLabels = data.layout.showLabels !== false;
     const t = $('#layout-title'); if (t) t.value = layout.title;
     const a = $('#layout-author'); if (a) a.value = layout.author;
     const tg = {
       showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
-      showScale: '#layout-show-scale', showCredit: '#layout-show-credit'
+      showScale: '#layout-show-scale', showCredit: '#layout-show-credit',
+      showLabels: '#layout-show-labels'
     };
     Object.keys(tg).forEach(k => {
       const el = $(tg[k]); if (el) el.checked = !!layout[k];
@@ -1976,6 +2203,8 @@ function init() {
 
   // ---- Ekspor / impor ----
   $('#btn-export-geojson').addEventListener('click', exportGeoJSON);
+  const csvBtn = $('#btn-export-csv');
+  if (csvBtn) csvBtn.addEventListener('click', exportCSV);
   $('#btn-export-png').addEventListener('click', () => PaperLayout.open('png'));
   $('#btn-print').addEventListener('click', () => PaperLayout.open('print'));
   const pickFile = () => $('#file-input').click();

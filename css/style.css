@@ -838,3 +838,35 @@ button, .tool, .tpl-row button, .icon-btn, .feat-item {
 }
 .inset-color::-webkit-color-swatch-wrapper { padding: 2px; }
 .inset-color::-webkit-color-swatch { border: 0; border-radius: 6px; }
+
+/* ================= LABEL NAMA FITUR DI PETA ================= */
+/* Label permanen: harus terbaca di atas basemap apa pun, jadi diberi
+   latar putih semi-pekat + garis tepi tipis, bukan teks telanjang. */
+.dm-feature-label {
+  background: rgba(255,255,255,.92) !important;
+  border: 1px solid rgba(26,35,50,.28) !important;
+  border-radius: 5px !important;
+  padding: 1px 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: var(--ink) !important;
+  box-shadow: 0 1px 3px rgba(16,30,54,.16) !important;
+  white-space: nowrap;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dm-feature-label::before { display: none !important; }  /* buang panah tooltip */
+/* Titik: label digeser ke atas agar tidak menutupi marker */
+.dm-label-point { margin-top: -6px; }
+
+@media print {
+  .dm-feature-label {
+    background: #fff !important;
+    border: 1px solid #333 !important;
+    box-shadow: none !important;
+    font-size: 10px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

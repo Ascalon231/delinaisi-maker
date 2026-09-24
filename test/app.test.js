@@ -1904,3 +1904,187 @@ test('cetak: hasil PDF satu halaman & elemen penting tetap ada', async ({ page }
   const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
   expect(pages).toBe(1);
 });
+
+/* ============================================================
+   Label nama fitur, round-trip proyek, dan ekspor CSV
+   ============================================================ */
+
+test('label: nama fitur tampil di peta & bisa dimatikan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.evaluate(() => {
+    const mk = (lls, n, c) => { const l = L.polygon(lls);
+      addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: n, category: c, desc: '', measure: null }, false); };
+    mk([[-6.90,107.58],[-6.90,107.62],[-6.94,107.62],[-6.94,107.58]], 'Kawasan Industri', 'batas_admin');
+    mk([[-6.95,107.60],[-6.95,107.64],[-6.99,107.64],[-6.99,107.60]], 'Sawah Irigasi', 'wilayah_studi');
+  });
+  await page.waitForTimeout(900);
+
+  // Label permanen muncul di peta (bukan hanya di popup)
+  const labels = () => page.evaluate(() =>
+    Array.from(document.querySelectorAll('#map .dm-feature-label')).map(e => e.textContent));
+  expect(await labels()).toContain('Kawasan Industri');
+  expect(await labels()).toContain('Sawah Irigasi');
+
+  const setToggle = (on) => page.evaluate((v) => {
+    const el = document.querySelector('#layout-show-labels');
+    el.checked = v;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, on);
+
+  await setToggle(false);
+  await page.waitForTimeout(700);
+  expect(await labels()).toEqual([]);
+
+  await setToggle(true);
+  await page.waitForTimeout(700);
+  expect((await labels()).length).toBe(2);
+
+  // Ganti nama -> label ikut berubah
+  await page.evaluate(() => { features[0].name = 'Nama Baru'; refreshFeature(features[0]); });
+  await page.waitForTimeout(600);
+  expect(await labels()).toContain('Nama Baru');
+
+  // Fitur tanpa nama tidak diberi label kosong
+  await page.evaluate(() => {
+    const l = L.polygon([[-6.80,107.58],[-6.80,107.62],[-6.83,107.62],[-6.83,107.58]]);
+    addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: '', category: 'lainnya', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(700);
+  expect((await labels()).length).toBe(2);
+});
+
+test('proyek: ekspor lalu impor memulihkan kop, preset & warna', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+  await page.locator('#layout-title').fill('PETA PENTING');
+  await page.locator('#kop-programStudy').fill('Perencanaan Wilayah dan Kota');
+  await page.locator('#kop-supervisorTitle').fill('Dosen Pembina');
+  await page.waitForTimeout(900);
+
+  // Warna kategori kustom
+  await page.locator('.cat-row[data-cat="batas_admin"] .cat-swatch').click();
+  await page.waitForTimeout(400);
+  await page.locator('.cat-row[data-cat="batas_admin"] .cat-hex').fill('#ff00aa');
+  await page.locator('.cat-row[data-cat="batas_admin"] .cat-hex').blur();
+  await page.waitForTimeout(700);
+
+  // Tangkap isi GeoJSON yang diekspor
+  const gj = await page.evaluate(async () => {
+    let captured = null;
+    const orig = URL.createObjectURL;
+    URL.createObjectURL = function (blob) { captured = blob; return orig.call(URL, blob); };
+    exportGeoJSON();
+    URL.createObjectURL = orig;
+    return captured ? await captured.text() : null;
+  });
+  const parsed = JSON.parse(gj);
+  expect(parsed.project).toBeDefined();
+  expect(parsed.project.tpl).toBe('formal');
+  expect(parsed.project.layout.kop.programStudy).toBe('Perencanaan Wilayah dan Kota');
+  expect(parsed.project.categories.find(c => c.id === 'batas_admin').color).toBe('#ff00aa');
+  expect(parsed.project.basemap).toBeDefined();
+  expect(parsed.project.view).toBeDefined();
+
+  // Reset lalu impor kembali
+  await page.evaluate(() => {
+    layout.title = ''; layout.kop.programStudy = ''; layout.kop.supervisorTitle = '';
+    CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
+    applyTemplate('klasik');
+  });
+  await page.waitForTimeout(800);
+  expect(await page.evaluate(() => layout.title)).toBe('');
+  expect(await page.evaluate(() => catOf('batas_admin').color)).toBe('#e63946');
+
+  await page.evaluate((t) => importGeoJSON(t), gj);
+  await page.waitForTimeout(1800);
+
+  const pulih = await page.evaluate(() => ({
+    judul: layout.title,
+    tpl: layout.tpl,
+    prodi: layout.kop.programStudy,
+    pembimbing: layout.kop.supervisorTitle,
+    warna: catOf('batas_admin').color,
+    lembar: !!document.querySelector('.formal-sheet'),
+    kontrolJudul: document.querySelector('#layout-title').value
+  }));
+  expect(pulih.judul).toBe('PETA PENTING');
+  expect(pulih.tpl).toBe('formal');
+  expect(pulih.prodi).toBe('Perencanaan Wilayah dan Kota');
+  expect(pulih.pembimbing).toBe('Dosen Pembina');
+  expect(pulih.warna).toBe('#ff00aa');
+  expect(pulih.lembar).toBe(true);
+  expect(pulih.kontrolJudul).toBe('PETA PENTING');
+});
+
+test('impor: properti dari QGIS/ArcGIS ikut terbaca', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  const gj = JSON.stringify({
+    type: 'FeatureCollection',
+    features: [
+      { type: 'Feature', properties: { NAMA: 'Desa Sukamaju', KETERANGAN: 'Batas desa', LUAS: 123.4 },
+        geometry: { type: 'Polygon', coordinates: [[[107.5,-6.9],[107.6,-6.9],[107.6,-6.95],[107.5,-6.9]]] } },
+      { type: 'Feature', properties: { NAME: 'Kawasan Hutan', desc: 'Area lindung' },
+        geometry: { type: 'Polygon', coordinates: [[[107.7,-6.9],[107.8,-6.9],[107.8,-6.95],[107.7,-6.9]]] } }
+    ]
+  });
+  await page.evaluate((t) => importGeoJSON(t), gj);
+  await page.waitForTimeout(1400);
+
+  const fitur = await page.evaluate(() => features.map(f => ({ name: f.name, desc: f.desc })));
+  expect(fitur.length).toBe(2);
+  expect(fitur[0].name).toBe('Desa Sukamaju');       // dari NAMA
+  expect(fitur[0].desc).toBe('Batas desa');          // dari KETERANGAN
+  expect(fitur[1].name).toBe('Kawasan Hutan');       // dari NAME
+  expect(fitur[1].desc).toBe('Area lindung');        // dari desc
+});
+
+test('CSV: tabel atribut untuk lampiran laporan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Keterangan sengaja memuat ';' dan kutip agar pengujian escaping nyata
+  await page.evaluate(() => {
+    const l = L.polygon([[-6.90,107.58],[-6.90,107.62],[-6.94,107.62],[-6.94,107.58]]);
+    addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: 'Sawah "Irigasi"',
+                 category: 'wilayah_studi', desc: 'Luas sawah; produktif', measure: null }, false);
+    const pt = L.marker([-6.88, 107.70]);
+    addFeature({ id: ++idSeq, layer: pt, type: 'Marker', name: 'Titik Pantau',
+                 category: 'lainnya', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(900);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30000 }),
+    page.locator('#btn-export-csv').click()
+  ]);
+  expect(download.suggestedFilename()).toBe('tabel-delinasi.csv');
+
+  const isi = await require('fs').promises.readFile(await download.path(), 'utf-8');
+
+  // BOM agar Excel membaca UTF-8 dengan benar
+  expect(isi.charCodeAt(0)).toBe(0xFEFF);
+
+  const lines = isi.replace(/^\uFEFF/, '').split(/\r?\n/);
+  expect(lines.length).toBe(3);                       // header + 2 fitur
+  expect(lines[0].split(';')).toHaveLength(12);       // 12 kolom
+
+  // Escaping benar: kutip digandakan, sel berisi ';' dibungkus kutip
+  expect(isi).toContain('"Sawah ""Irigasi"""');
+  expect(isi).toContain('"Luas sawah; produktif"');
+
+  // Desimal memakai koma (gaya Indonesia) & ada kolom koordinat
+  expect(lines[1]).toMatch(/\d+,\d+/);
+  expect(lines[1]).toContain('-6,920000');
+});
