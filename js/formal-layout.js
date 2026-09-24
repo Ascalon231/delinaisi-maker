@@ -29,10 +29,19 @@ const FormalLayout = (function () {
   /* -------------------- Format koordinat (DMS) -------------------- */
   // 107.25 -> 107°15'0"E
   function toDMS(value, isLat) {
+    let v0 = value;
+    // Normalisasi: lintang dijepit ke -90..90, bujur dilipat ke -180..180.
+    // Tanpa ini, label bisa tercetak "190°0'0\"E" yang mustahil.
+    if (isLat) {
+      v0 = Math.max(-90, Math.min(90, v0));
+    } else {
+      v0 = ((v0 + 180) % 360 + 360) % 360 - 180;
+      if (v0 === -180) v0 = 180;
+    }
     const hemi = isLat
-      ? (value >= 0 ? 'N' : 'S')
-      : (value >= 0 ? 'E' : 'W');
-    let v = Math.abs(value);
+      ? (v0 >= 0 ? 'N' : 'S')
+      : (v0 >= 0 ? 'E' : 'W');
+    let v = Math.abs(v0);
     let d = Math.floor(v);
     let mFloat = (v - d) * 60;
     let m = Math.floor(mFloat);
@@ -76,6 +85,23 @@ const FormalLayout = (function () {
     return n.toLocaleString('id-ID');
   }
 
+  // Geser posisi label agar seluruh teksnya berada di dalam lebar kanvas.
+  // Label di tepi paling rawan terpotong saat diekspor ke PNG.
+  function clampLabel(x, textWidth, align, canvasWidth, pad) {
+    // Padding menjaga teks tidak menempel tepi kanvas. Tanpa ini, label yang
+    // dijepit tepat ke tepi akan terlihat terpotong saat diekspor PNG.
+    const p = (pad == null) ? 6 : pad;
+    const minLeft = Math.min(p, Math.max(0, canvasWidth - textWidth));
+    const maxLeft = Math.max(minLeft, canvasWidth - textWidth - p);
+    let left = (align === 'left') ? x
+      : (align === 'right') ? x - textWidth
+      : x - textWidth / 2;
+    left = Math.max(minLeft, Math.min(left, maxLeft));
+    if (align === 'left') return left;
+    if (align === 'right') return left + textWidth;
+    return left + textWidth / 2;
+  }
+
   /* -------------------- Graticule ke canvas -------------------- */
   // Menggambar grid lintang/bujur pada kanvas berukuran `size`,
   // beserta label DMS di margin luar frame.
@@ -88,9 +114,12 @@ const FormalLayout = (function () {
     const fontSize = opts.fontSize || 10;
     const showEdgeLabels = opts.showEdgeLabels !== false;
 
-    // Area peta di dalam margin frame
-    const x0 = margin, y0 = margin;
-    const x1 = size.x - margin, y1 = size.y - margin;
+    // Area gambar peta. Sebuah inset kecil dipakai supaya garis grid tidak
+    // menyentuh tepi kanvas: saat diekspor ke PNG, garis yang menempel tepi
+    // terlihat seperti terpotong. Label duduk di dalam inset ini.
+    const PAD = opts.pad != null ? opts.pad : 12;
+    const x0 = margin + PAD, y0 = margin + PAD;
+    const x1 = size.x - margin - PAD, y1 = size.y - margin - PAD;
 
     // Batas geografis dari sudut area peta
     const nw = map.containerPointToLatLng([x0, y0]);
@@ -111,7 +140,7 @@ const FormalLayout = (function () {
     for (let lat = firstLat; lat <= latTop; lat += step) {
       const p = map.latLngToContainerPoint(L.latLng(lat, lngLeft));
       const y = p.y;
-      if (y < y0 - 1 || y > y1 + 1) continue;
+      if (y < y0 || y > y1) continue;
 
       ctx.beginPath();
       ctx.moveTo(x0, y);
@@ -120,20 +149,27 @@ const FormalLayout = (function () {
 
       const label = toDMS(lat, true);
       if (showEdgeLabels) {
+        const tw = ctx.measureText(label).width;
+        // Label diletakkan di dalam inset (bukan menempel tepi kanvas),
+        // lalu tetap dijepit agar tidak terpotong saat ekspor PNG.
+        const pad = Math.max(2, Math.round((PAD - tw) / 2) + (margin > 0 ? margin : 0));
+        const leftX = pad;
+        const rightX = Math.max(leftX, size.x - pad);
         ctx.textAlign = 'left';
-        // Label di sisi KIRI (di margin) dan KANAN (di margin)
-        ctx.fillText(label, margin > 16 ? 2 : x0 + 3, y);
+        ctx.fillText(label, clampLabel(leftX, tw, 'left', size.x, 2), y);
         ctx.textAlign = 'right';
-        ctx.fillText(label, size.x - (margin > 16 ? 2 : 3), y);
+        ctx.fillText(label, clampLabel(rightX, tw, 'right', size.x, 2), y);
       }
     }
 
     // --- Garis bujur (vertikal) ---
+    // Toleransi 0 (bukan ±1) supaya garis tidak pernah menyentuh tepi kanvas:
+    // garis yang menempel tepi akan terlihat terpotong saat diekspor PNG.
     const firstLng = Math.ceil(lngLeft / step) * step;
     for (let lng = firstLng; lng <= lngRight; lng += step) {
       const p = map.latLngToContainerPoint(L.latLng(latTop, lng));
       const x = p.x;
-      if (x < x0 - 1 || x > x1 + 1) continue;
+      if (x < x0 || x > x1) continue;
 
       ctx.beginPath();
       ctx.moveTo(x, y0);
@@ -142,10 +178,14 @@ const FormalLayout = (function () {
 
       const label = toDMS(lng, false);
       if (showEdgeLabels) {
+        const tw = ctx.measureText(label).width;
         ctx.textAlign = 'center';
-        // Label di sisi ATAS dan BAWAH (di margin)
-        ctx.fillText(label, x, margin > 16 ? 8 : y0 + 10);
-        ctx.fillText(label, x, size.y - (margin > 16 ? 8 : 10));
+        // Label atas & bawah dijepit horizontal agar tidak keluar kanvas.
+        const cx = clampLabel(x, tw, 'center', size.x);
+        const cyTop = margin > 16 ? 8 : Math.max(8, y0 - 4);
+        const cyBot = margin > 16 ? size.y - 8 : Math.min(size.y - 8, y1 + 10);
+        ctx.fillText(label, cx, cyTop);
+        ctx.fillText(label, cx, cyBot);
       }
     }
 
@@ -271,6 +311,7 @@ const FormalLayout = (function () {
 
   return {
     toDMS: toDMS,
+    clampLabel: clampLabel,
     intervalFor: intervalFor,
     drawGraticule: drawGraticule,
     buildScaleBar: buildScaleBar,

@@ -1642,3 +1642,157 @@ test('inset: mode "sama dengan peta utama" ikut berubah saat peta dasar diganti'
   expect(u.inset).not.toBe('');
   expect(u.inset).toContain('cartocdn');
 });
+
+/* ============================================================
+   Graticule tidak boleh keluar batas (terutama saat ekspor PNG)
+   ============================================================ */
+
+test('graticule: label tidak terpotong di semua tingkat zoom', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+
+  // Diuji di beberapa zoom: label di tepi paling rawan terpotong saat
+  // lembar diekspor ke PNG.
+  for (const [z, lat, lng] of [[3, -2.5, 118], [5, -2.5, 118], [8, -6.9, 107.6],
+                               [10, -6.9, 107.6], [13, -6.9, 107.6]]) {
+    const tepi = await page.evaluate(({ z, lat, lng }) => {
+      map.setView([lat, lng], z, { animate: false });
+      FormalSheet.refresh();
+      const c = document.querySelector('#fl-graticule');
+      const ctx = c.getContext('2d');
+      const W = c.width, H = c.height;
+      const hitung = (x0, y0, w, h) => {
+        const d = ctx.getImageData(x0, y0, w, h).data;
+        let n = 0;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+        return n;
+      };
+      return {
+        kiri: hitung(0, 0, 1, H), kanan: hitung(W - 1, 0, 1, H),
+        atas: hitung(0, 0, W, 1), bawah: hitung(0, H - 1, W, 1),
+        // Label harus tetap tergambar (tidak hilang karena dijepit)
+        adaTinta: hitung(0, 0, W, H)
+      };
+    }, { z, lat, lng });
+
+    expect(tepi.kiri).toBe(0);
+    expect(tepi.kanan).toBe(0);
+    expect(tepi.atas).toBe(0);
+    expect(tepi.bawah).toBe(0);
+    expect(tepi.adaTinta).toBeGreaterThan(0);   // bukan kosong
+  }
+});
+
+test('graticule: nilai koordinat dinormalisasi (tidak ada 190°E)', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  const r = await page.evaluate(() => ({
+    lng190: FormalLayout.toDMS(190, false),
+    lng200: FormalLayout.toDMS(200, false),
+    lngNeg190: FormalLayout.toDMS(-190, false),
+    lng180: FormalLayout.toDMS(180, false),
+    lngNeg180: FormalLayout.toDMS(-180, false),
+    lat95: FormalLayout.toDMS(95, true),
+    latNeg95: FormalLayout.toDMS(-95, true),
+    normal: FormalLayout.toDMS(107.25, false),
+    normalSelatan: FormalLayout.toDMS(-6.9, true)
+  }));
+
+  // Bujur tidak pernah melebihi 180°
+  expect(r.lng190).toBe('170\u00B00\'0"W');
+  expect(r.lng200).toBe('160\u00B00\'0"W');
+  expect(r.lngNeg190).toBe('170\u00B00\'0"E');
+  expect(r.lng180).toBe('180\u00B00\'0"E');
+  expect(r.lngNeg180).toBe('180\u00B00\'0"E');
+  // Lintang dijepit ke kutub
+  expect(r.lat95).toBe('90\u00B00\'0"N');
+  expect(r.latNeg95).toBe('90\u00B00\'0"S');
+  // Nilai wajar tidak berubah
+  expect(r.normal).toBe('107\u00B015\'0"E');
+  expect(r.normalSelatan).toBe('6\u00B054\'0"S');
+
+  // clampLabel menjaga label tetap di dalam lebar kanvas, dengan padding
+  // agar teks tidak menempel tepi (mencegah terpotong saat ekspor PNG).
+  const c = await page.evaluate(() => {
+    const rentang = (pusat, tw, align) => {
+      const kiri = align === 'center' ? pusat - tw / 2
+        : align === 'right' ? pusat - tw : pusat;
+      return { kiri, kanan: kiri + tw };
+    };
+    const cases = [
+      rentang(FormalLayout.clampLabel(-10, 40, 'center', 800), 40, 'center'),
+      rentang(FormalLayout.clampLabel(810, 40, 'center', 800), 40, 'center'),
+      rentang(FormalLayout.clampLabel(3, 40, 'left', 800), 40, 'left'),
+      rentang(FormalLayout.clampLabel(798, 40, 'right', 800), 40, 'right'),
+      rentang(FormalLayout.clampLabel(400, 40, 'center', 800), 40, 'center')
+    ];
+    return cases;
+  });
+  c.forEach(r => {
+    expect(r.kiri).toBeGreaterThanOrEqual(0);
+    expect(r.kanan).toBeLessThanOrEqual(800);
+  });
+  // Nilai yang masih di tengah tidak digeser
+  expect(c[4].kiri).toBeCloseTo(380, 5);
+});
+
+test('ekspor PNG: border lembar & label berada di dalam gambar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1800);
+  await page.locator('#layout-title').fill('PETA DELINASI');
+  await page.waitForTimeout(800);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 90000 }),
+    page.locator('#btn-export-png').click()
+  ]);
+  expect(download.suggestedFilename()).toBe('peta-kop-akademik.png');
+
+  const buf = await require('fs').promises.readFile(await download.path());
+  expect(buf.slice(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+
+  // Analisis tepi: border lembar harus berada DI DALAM gambar, tidak menempel
+  const edge = await page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = 'data:image/png;base64,' + b64;
+    await img.decode();
+    const c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height;
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    const W = img.width, H = img.height;
+    const px = (a, b) => Array.from(x.getImageData(a, b, 1, 1).data).slice(0, 3);
+    const cariGelap = (axis, arah) => {
+      for (let i = 0; i < 80; i++) {
+        const p = axis === 'x'
+          ? px(arah === '+' ? i : W - 1 - i, Math.round(H / 2))
+          : px(Math.round(W / 2), arah === '+' ? i : H - 1 - i);
+        if (p[0] < 120 && p[1] < 120 && p[2] < 120) return i;
+      }
+      return -1;
+    };
+    return {
+      W, H,
+      kiri: cariGelap('x', '+'), kanan: cariGelap('x', '-'),
+      atas: cariGelap('y', '+'), bawah: cariGelap('y', '-')
+    };
+  }, buf.toString('base64'));
+
+  // PNG dinaikkan 2x untuk preset formal
+  expect(edge.W).toBeGreaterThan(800);
+  // Keempat sisi border berada di dalam gambar (jarak > 0 dari tepi)
+  expect(edge.kiri).toBeGreaterThan(0);
+  expect(edge.kanan).toBeGreaterThan(0);
+  expect(edge.atas).toBeGreaterThan(0);
+  expect(edge.bawah).toBeGreaterThan(0);
+});
