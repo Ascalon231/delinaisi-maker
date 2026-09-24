@@ -11,7 +11,8 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
 
 - **Gambar di peta**: titik, garis, poligon, persegi, lingkaran
 - **Hitung otomatis**: luas (m²/ha/km²), keliling/panjang (m/km), koordinat
-- **Label & atribut**: nama, jenis deliniasi (8 kategori dengan warna berbeda), keterangan
+- **Label & atribut**: nama, jenis deliniasi (7 kategori dengan warna berbeda), keterangan
+- **Nama fitur tampil di peta** (label permanen), bisa dimatikan lewat toggle
 - **Layout peta** mengikuti standar kartografi Indonesia (8 elemen wajib):
   **judul** (tengah-atas), **legenda** (kanan, auto-update), **arah utara** (kanan-atas),
   **skala** (kiri-bawah), dan **kotak kredit** (kanan-bawah) berisi nama pembuat,
@@ -68,7 +69,13 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   - **Aksesibilitas** — aria-label di semua tombol ikon, focus trap di modal, skip link,
     dukungan `prefers-reduced-motion`
   - **Responsif penuh** — di layar kecil, panel kiri jadi drawer dengan backdrop & tombol tutup
-- **Ekspor GeoJSON** (bisa dibuka di QGIS) atau **PNG** (untuk laporan)
+- **Ekspor GeoJSON** — menyimpan **seluruh proyek** (kop, preset, warna
+  kategori, posisi peta), jadi bisa dilanjutkan di komputer lain
+- **Ekspor tabel CSV** untuk lampiran laporan (12 kolom: luas, keliling,
+  koordinat) — siap dibuka di Excel dengan format Indonesia
+- **Impor GeoJSON** dari QGIS/ArcGIS; properti seperti `NAMA`, `NAME`,
+  `KETERANGAN`, `desc` ikut terbaca
+- **Ekspor PNG** untuk laporan
 - **Cetak / PDF** langsung dari browser
 - **Otomatis tersimpan** di browser (localStorage) — aman dari refresh tak sengaja
 - **Responsif** untuk laptop & HP, antarmuka lengkap dalam Bahasa Indonesia
@@ -91,7 +98,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (48 test)
+# Jalankan test (57 test)
 npm test
 ```
 
