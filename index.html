@@ -61,10 +61,16 @@
 
       <section class="card">
         <h2>1 · Pilih peta dasar</h2>
+        <p class="hint hint-tight">Semua peta dasar gratis &amp; tanpa API key.</p>
         <div class="basemap-row" id="basemap-row">
-          <button data-basemap="streets" class="active">Peta Jalan</button>
-          <button data-basemap="satellite">Satelit</button>
-          <button data-basemap="light">Minimal</button>
+          <button data-basemap="streets" class="active" title="OpenStreetMap — jalan &amp; tempat">Peta Jalan</button>
+          <button data-basemap="satellite" title="Esri World Imagery — citra satelit">Satelit</button>
+          <button data-basemap="terrain" title="Esri Topo — relief &amp; bentuk lahan">Relief</button>
+          <button data-basemap="topo" title="OpenTopoMap — kontur &amp; puncak">Topografi</button>
+          <button data-basemap="light" title="CARTO Positron — polos, cocok untuk laporan">Minimal</button>
+          <button data-basemap="voyager" title="CARTO Voyager — jalan versi bersih">Voyager</button>
+          <button data-basemap="dark" title="CARTO Dark — gelap, poligon lebih menonjol">Gelap</button>
+          <button data-basemap="none" title="Tanpa peta dasar — hanya latar polos">Kosong</button>
         </div>
       </section>
 

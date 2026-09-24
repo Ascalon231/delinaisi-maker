@@ -38,6 +38,11 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
     **ditambah, diganti nama, dan dihapus** — semuanya tersimpan otomatis
   - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
   - Semua teks berasal dari input user (generik, bisa untuk topik apa pun)
+- **8 peta dasar, semuanya gratis & tanpa API key**: Peta Jalan (OpenStreetMap),
+  Satelit (Esri), **Relief** (Esri Topo — bentuk lahan), **Topografi**
+  (OpenTopoMap — kontur & puncak), Minimal & Voyager & Gelap (CARTO), serta
+  **Kosong** (tanpa peta dasar). Sengaja tidak memakai penyedia ber-API key
+  seperti Stadia/Mapbox/Thunderforest agar tidak gagal di komputer pengguna.
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
 - **Edit bentuk** ulang lewat alat Edit
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)
@@ -71,7 +76,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (26 test)
+# Jalankan test (29 test)
 npm test
 ```
 

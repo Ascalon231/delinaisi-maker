@@ -177,11 +177,13 @@ svg { display: block; }
 }
 
 /* ---------- BASEMAP BUTTONS ---------- */
-.basemap-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.basemap-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
 .basemap-row button {
   border: 1px solid var(--line); background: #f8fafc; color: var(--ink-soft);
-  border-radius: 8px; padding: 8px 4px; font-size: 12px; font-weight: 600;
+  border-radius: 8px; padding: 7px 3px; font-size: 11px; font-weight: 600;
+  line-height: 1.25; word-break: break-word;
 }
+.hint-tight { margin: 0 0 7px; }
 .basemap-row button:hover { background: #eef3fa; }
 .basemap-row button.active {
   background: #e8efff; border-color: var(--primary); color: var(--primary-d);

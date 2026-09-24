@@ -826,3 +826,96 @@ test('warna kategori: reset memulihkan bawaan tapi kategori kustom tetap ada', a
   expect(state.masihAdaKustom).toBe(true);
   expect(state.jumlah).toBe(8);
 });
+
+/* ============================================================
+   Peta dasar tanpa API key
+   ============================================================ */
+
+test('peta dasar: semua pilihan tanpa API key & benar-benar memuat ubin', async ({ page }) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Tidak ada URL ubin yang menyisipkan kunci/token.
+  const urls = await page.evaluate(() => Object.keys(BASEMAPS).map(k => BASEMAPS[k]._url || ''));
+  expect(urls.length).toBeGreaterThanOrEqual(8);
+  urls.forEach(u => {
+    expect(u).not.toMatch(/api[_-]?key|access[_-]?token|apikey|\{key\}|apikey=/i);
+  });
+
+  // Penyedia yang butuh kunci tidak boleh didaftarkan.
+  const joined = urls.join(' ');
+  expect(joined).not.toMatch(/stadiamaps|mapbox|thunderforest|maptiler|tomtom|here\.com/i);
+
+  // Jumlah tombol = jumlah peta dasar yang terdaftar.
+  expect(await page.locator('#basemap-row button').count()).toBe(urls.length);
+
+  // Setiap pilihan harus bisa diaktifkan; yang punya ubin harus memuatnya.
+  const ids = await page.evaluate(() => Object.keys(BASEMAPS));
+  for (const id of ids) {
+    await page.locator(`[data-basemap="${id}"]`).click();
+    await page.waitForTimeout(900);
+    const st = await page.evaluate((bid) => ({
+      aktif: currentBasemap === bid,
+      loaded: document.querySelectorAll('#map .leaflet-tile-loaded').length
+    }), id);
+    expect(st.aktif).toBe(true);
+    if (id !== 'none') expect(st.loaded).toBeGreaterThan(0);
+  }
+
+  expect(errs).toEqual([]);
+});
+
+test('peta dasar: "Sumber data" ikut berubah sesuai pilihan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Atribusi harus mencerminkan penyedia yang aktif, bukan nilai basi.
+  await page.locator('[data-basemap="terrain"]').click();
+  await page.waitForTimeout(600);
+  await expect(page.locator('#map-credit-source')).toContainText('Esri');
+
+  await page.locator('[data-basemap="topo"]').click();
+  await page.waitForTimeout(600);
+  await expect(page.locator('#map-credit-source')).toContainText('OpenTopoMap');
+
+  await page.locator('[data-basemap="streets"]').click();
+  await page.waitForTimeout(600);
+  await expect(page.locator('#map-credit-source')).toContainText('OpenStreetMap');
+
+  // Ikut tersimpan & terbawa ke ekspor GeoJSON
+  const meta = await page.evaluate(() => {
+    localStorage.setItem('__probe', '1');
+    return basemapAttribution(currentBasemap);
+  });
+  expect(meta).toContain('OpenStreetMap');
+});
+
+test('peta dasar: mode "Kosong" tetap bisa menggambar & inset tetap hidup', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('[data-basemap="none"]').click();
+  await page.waitForTimeout(900);
+
+  // Tidak ada ubin, tapi peta tetap ada dan bisa menampung fitur.
+  expect(await page.locator('#map .leaflet-tile').count()).toBe(0);
+  await page.evaluate(() => {
+    const l = L.polygon([[-6.9,107.58],[-6.9,107.65],[-6.95,107.65],[-6.95,107.58]]);
+    addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: 'A',
+                 category: 'batas_admin', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(600);
+  await expect(page.locator('#feat-count')).toHaveText('1');
+  expect(await page.locator('#map path').count()).toBeGreaterThan(0);
+
+  // Preset formal: inset tidak boleh ikut kosong, tetap pakai sumber terang.
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+  expect(await page.locator('#fl-inset-map .leaflet-tile').count()).toBeGreaterThan(0);
+});

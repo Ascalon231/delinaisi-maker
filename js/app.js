@@ -550,6 +550,9 @@ function trapFocus(container, e) {
 }
 
 /* -------------------- Peta dasar -------------------- */
+// Semua peta dasar di bawah ini GRATIS & TANPA API KEY / token.
+// Jangan tambahkan penyedia yang butuh kunci (mis. Stadia Maps, Mapbox,
+// Thunderforest) karena akan gagal 401 di komputer pengguna.
 const BASEMAPS = {
   streets: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, crossOrigin: true,
@@ -562,15 +565,40 @@ const BASEMAPS = {
   light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 19, subdomains: 'abcd', crossOrigin: true,
     attribution: '© OpenStreetMap, © CARTO'
-  })
+  }),
+  // Relief/terrain: penting untuk analisis wilayah (kemiringan, DAS, tutupan lahan).
+  terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, crossOrigin: true,
+    attribution: '© Esri, HERE, Garmin, USGS, Intermap'
+  }),
+  // Topografi OpenTopoMap: kontur & nama puncak, cocok untuk tugas geomorfologi.
+  topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17, crossOrigin: true,
+    attribution: '© OpenTopoMap (CC-BY-SA), © kontributor OpenStreetMap'
+  }),
+  // Versi gelap: enak dilihat malam & membuat poligon berwarna lebih menonjol.
+  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd', crossOrigin: true,
+    attribution: '© OpenStreetMap, © CARTO'
+  }),
+  // Peta jalan versi CARTO: label lebih bersih dari OSM standar.
+  voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd', crossOrigin: true,
+    attribution: '© OpenStreetMap, © CARTO'
+  }),
+  // Tanpa peta dasar: hanya latar polos, untuk delinasi di atas citra sendiri.
+  none: L.tileLayer('', { attribution: '' })
 };
 
 function setBasemap(id, skipSave) {
   if (!BASEMAPS[id]) return;
   if (BASEMAPS[currentBasemap]) map.removeLayer(BASEMAPS[currentBasemap]);
   currentBasemap = id;
-  map.addLayer(BASEMAPS[id]);
-  BASEMAPS[id].bringToBack();
+  // 'none' = tanpa ubin: hanya latar polos dari CSS.
+  if (id !== 'none') {
+    map.addLayer(BASEMAPS[id]);
+    BASEMAPS[id].bringToBack();
+  }
   // Indikator loading: tampil saat tile masih dimuat.
   const layer = BASEMAPS[id];
   const loader = $('#tile-loader');
@@ -581,6 +609,9 @@ function setBasemap(id, skipSave) {
   }
   if (loader) loader.classList.remove('hidden');
   $$('#basemap-row button').forEach(b => b.classList.toggle('active', b.dataset.basemap === id));
+  // Kotak kredit menampilkan "Sumber data" sesuai peta dasar aktif —
+  // tanpa ini atribusi bisa menyebut penyedia yang salah di laporan.
+  if (typeof updateLayout === 'function') updateLayout();
   if (!skipSave) save();
 }
 
@@ -673,7 +704,12 @@ function basemapAttribution(id) {
   const m = {
     streets: 'OpenStreetMap & kontributornya',
     satellite: 'Esri, Maxar, Earthstar Geographics',
-    light: 'OpenStreetMap & CARTO'
+    light: 'OpenStreetMap & CARTO',
+    terrain: 'Esri, HERE, Garmin, USGS, Intermap',
+    topo: 'OpenTopoMap (CC-BY-SA) & kontributor OpenStreetMap',
+    dark: 'OpenStreetMap & CARTO',
+    voyager: 'OpenStreetMap & CARTO',
+    none: 'Data delinasi pengguna'
   };
   return m[id] || 'OpenStreetMap';
 }

@@ -18,6 +18,7 @@ const FormalSheet = (function () {
   let sheet = null;          // root .formal-sheet
   let mapHost = null;        // wadah peta utama di dalam frame
   let insetMap = null;       // instance Leaflet kedua
+  let insetLayer = null;     // layer ubin inset
   let insetBox = null;       // rectangle cakupan peta utama
   let insetReady = false;
   let rafId = null;
@@ -305,7 +306,16 @@ const FormalSheet = (function () {
       tap: false
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    // Inset memakai sumber ubin yang sama dengan peta utama (semua tanpa
+    // API key), tapi selalu versi terang/polos agar kotak merah cakupan
+    // mudah terlihat. Untuk basemap 'none', inset pakai Minimal.
+    const src = (typeof BASEMAPS !== 'undefined' && BASEMAPS.light)
+      ? BASEMAPS.light
+      : null;
+    const url = src && src._url
+      ? src._url
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    insetLayer = L.tileLayer(url, {
       maxZoom: 19,
       subdomains: 'abcd',
       crossOrigin: true
@@ -518,6 +528,7 @@ const FormalSheet = (function () {
       }
       insetMap = null;
       insetBox = null;
+      insetLayer = null;
       insetReady = false;
     },
 
