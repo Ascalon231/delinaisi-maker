@@ -264,10 +264,69 @@ function measureRows(f) {
 }
 
 /* -------------------- Gaya & ikon -------------------- */
+// Isian sengaja tetap bening (peta dasar harus tetap terbaca), sedangkan
+// keterbacaan dijaga lewat GARIS TEPI yang tegas + halo putih tipis.
+// Halo ini yang membuat poligon tetap terlihat di atas basemap gelap
+// (mis. Satelit/Gelap), di mana warna seperti ungu bisa tenggelam.
 function styleFor(type, color) {
-  if (type === 'Polyline') return { color, weight: 3, opacity: .95, lineJoin: 'round' };
-  if (type === 'Marker')   return {};
-  return { color, weight: 2.5, opacity: .95, fillColor: color, fillOpacity: .22, lineJoin: 'round' };
+  if (type === 'Polyline') {
+    // Garis juga dapat halo: garis tipis paling rawan tenggelam di
+    // atas basemap gelap.
+    return { color, weight: 3, opacity: .98, lineJoin: 'round', halo: true };
+  }
+  if (type === 'Marker') return {};
+  return {
+    color,
+    weight: 2.5,
+    opacity: .98,
+    fillColor: color,
+    fillOpacity: .28,
+    lineJoin: 'round',
+    // Halo putih di bawah garis agar kontras terjaga di latar apa pun.
+    // Leaflet tidak punya properti ini, jadi dipasang sebagai opsi kustom
+    // dan diterapkan lewat pane terpisah di applyStyle().
+    halo: true
+  };
+}
+
+// Lapisan halo: salinan garis putih yang digambar tepat di bawah fitur.
+function ensureHaloLayer() {
+  if (!map.__haloGroup) {
+    map.__haloGroup = L.featureGroup().addTo(map);
+  }
+  return map.__haloGroup;
+}
+
+// Bangun ulang halo untuk satu fitur (garis putih lebih tebal di bawahnya).
+function applyHalo(f, color) {
+  if (f.type === 'Marker' || f.type === 'Circle') return;
+  const group = ensureHaloLayer();
+  if (f.__halo) { group.removeLayer(f.__halo); f.__halo = null; }
+  if (!styleFor(f.type, color).halo) return;
+
+  let layer = null;
+  try {
+    if (f.type === 'Polyline') {
+      layer = L.polyline(f.layer.getLatLngs(), {
+        color: '#ffffff', weight: 6.5, opacity: .85,
+        lineJoin: 'round', interactive: false
+      });
+    } else {
+      layer = L.polygon(f.layer.getLatLngs(), {
+        color: '#ffffff', weight: 6.5, opacity: .85,
+        fill: false, lineJoin: 'round', interactive: false
+      });
+    }
+  } catch (e) { return; }
+
+  layer.addTo(group);
+  // Halo harus tepat di bawah fitur aslinya.
+  const pane = group.getPane ? group.getPane() : null;
+  f.__halo = layer;
+  group.bringToBack();
+  if (typeof drawnItems !== 'undefined' && drawnItems.bringToFront) {
+    drawnItems.bringToFront();
+  }
 }
 
 function markerIcon(color) {
@@ -289,6 +348,8 @@ function applyStyle(f) {
   } else if (f.layer.setStyle) {
     f.layer.setStyle(styleFor(f.type, color));
   }
+  // Halo putih menjaga keterbacaan di atas basemap gelap.
+  applyHalo(f, color);
 }
 
 /* -------------------- Popup -------------------- */
@@ -409,6 +470,10 @@ function deleteFeature(id) {
   map.closePopup();
   const removed = features[i];
   drawnItems.removeLayer(removed.layer);
+  if (removed.__halo && map.__haloGroup) {
+    map.__haloGroup.removeLayer(removed.__halo);
+    removed.__halo = null;
+  }
   features.splice(i, 1);
   renderList();
   save();
@@ -431,7 +496,10 @@ function clearAll() {
   if (!confirm('Hapus semua ' + features.length + ' fitur dari peta? Tindakan ini tidak bisa dibatalkan.')) return;
   map.closePopup();
   const backup = features.slice();
-  features.forEach(f => drawnItems.removeLayer(f.layer));
+  features.forEach(f => {
+    drawnItems.removeLayer(f.layer);
+    if (f.__halo && map.__haloGroup) map.__haloGroup.removeLayer(f.__halo);
+  });
   features = [];
   renderList();
   save();
@@ -439,7 +507,7 @@ function clearAll() {
     actionLabel: 'Urungkan',
     onAction: () => {
       features = backup;
-      features.forEach(f => drawnItems.addLayer(f.layer));
+      features.forEach(f => { drawnItems.addLayer(f.layer); applyStyle(f); });
       renderList();
       save();
       toast(backup.length + ' fitur dipulihkan');

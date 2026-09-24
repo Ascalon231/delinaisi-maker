@@ -165,7 +165,8 @@
 .fl-inset-map { position: absolute; inset: 0; }
 .fl-inset-attr {
   position: absolute; right: 0; bottom: 0; z-index: 500;
-  background: rgba(255,255,255,.86);
+  /* Cukup pekat agar teks 7px terbaca, tapi tidak menutupi peta inset. */
+  background: rgba(255,255,255,.78);
   font-family: sans-serif;
   font-size: 7px; line-height: 1.2; color: #222;
   padding: 1px 3px; border-top: 1px solid #bbb; border-left: 1px solid #bbb;
@@ -180,7 +181,9 @@
 
 /* Kotak merah cakupan peta utama */
 .fl-inset-box {
-  stroke: #e01b1b; stroke-width: 1.8; fill: rgba(224,27,27,.10);
+  stroke: #e01b1b; stroke-width: 1.8;
+  /* Isian dinaikkan dari .10 karena praktis tak terlihat di atas peta. */
+  fill: rgba(224,27,27,.18);
 }
 
 /* Legenda */

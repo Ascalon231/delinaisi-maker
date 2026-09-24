@@ -1366,3 +1366,109 @@ test('lembar formal: posisi teks sesuai tata letak kop', async ({ page }) => {
   const menaik = urutan.every((y, i) => i === 0 || y >= urutan[i - 1]);
   expect(menaik).toBe(true);
 });
+
+/* ============================================================
+   Transparansi: tidak terlalu bening, tidak terlalu pekat
+   ============================================================ */
+
+test('transparansi: isian poligon tetap terlihat tanpa menutupi peta dasar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.waitForTimeout(800);
+
+  const s = await page.evaluate(() => features
+    .filter(f => f.type === 'Polygon')
+    .map(f => ({ fill: f.layer.options.fillOpacity, stroke: f.layer.options.opacity })));
+
+  expect(s.length).toBe(3);
+  s.forEach(v => {
+    // Terlalu bening (<0.2) membuat delinasi tak terlihat saat dicetak;
+    // terlalu pekat (>0.5) menutupi peta dasar sehingga konteks hilang.
+    expect(v.fill).toBeGreaterThanOrEqual(0.2);
+    expect(v.fill).toBeLessThanOrEqual(0.5);
+    // Garis tepi harus tegas karena inilah yang membuat poligon terbaca.
+    expect(v.stroke).toBeGreaterThanOrEqual(0.9);
+  });
+});
+
+test('transparansi: halo putih menjaga keterbacaan di basemap gelap', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Poligon (dapat halo) + garis (dapat halo) + titik (tanpa halo)
+  await page.evaluate(() => {
+    const poly = L.polygon([[-6.90,107.58],[-6.90,107.62],[-6.94,107.62],[-6.94,107.58]]);
+    addFeature({ id: ++idSeq, layer: poly, type: 'Polygon', name: 'A',
+                 category: 'daerah_pemilihan', desc: '', measure: null }, false);
+    const line = L.polyline([[-6.85,107.55],[-6.85,107.62]]);
+    addFeature({ id: ++idSeq, layer: line, type: 'Polyline', name: 'J',
+                 category: 'jaringan_jalan', desc: '', measure: null }, false);
+    const pt = L.marker([-6.88,107.70]);
+    addFeature({ id: ++idSeq, layer: pt, type: 'Marker', name: 'T',
+                 category: 'lainnya', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(900);
+
+  const halo = await page.evaluate(() => ({
+    jumlah: map.__haloGroup ? map.__haloGroup.getLayers().length : 0,
+    warna: map.__haloGroup ? map.__haloGroup.getLayers().map(l => l.options.color) : [],
+    // Poligon/garis dapat halo; titik & lingkaran tidak
+    adaIsian: map.__haloGroup ? map.__haloGroup.getLayers().map(l => l.options.fill) : []
+  }));
+  expect(halo.jumlah).toBe(2);
+  halo.warna.forEach(c => expect(c).toBe('#ffffff'));
+  halo.adaIsian.forEach(f => expect(f).toBe(false));  // hanya garis, tanpa isian
+
+  // Halo berada DI BAWAH fitur sehingga tidak menutupi warnanya
+  const urutan = await page.evaluate(() => {
+    const paths = Array.from(document.querySelectorAll('#map path'));
+    const iHalo = paths.findIndex(e => e.getAttribute('stroke') === '#ffffff');
+    const iFitur = paths.findIndex(e => {
+      const st = e.getAttribute('stroke');
+      return st && st !== '#ffffff';
+    });
+    return { iHalo, iFitur };
+  });
+  expect(urutan.iHalo).toBeGreaterThanOrEqual(0);
+  expect(urutan.iHalo).toBeLessThan(urutan.iFitur);
+
+  // Hapus fitur -> halo ikut bersih (tidak ada sisa garis putih)
+  await page.evaluate(() => deleteFeature(features[0].id));
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() => map.__haloGroup.getLayers().length)).toBe(1);
+});
+
+test('transparansi: atribusi inset & kotak cakupan tidak ekstrem', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+
+  // Atribusi: harus terbaca (cukup pekat) tapi tidak menutupi peta inset
+  const alpha = await page.evaluate(() => {
+    const bg = getComputedStyle(document.querySelector('.fl-inset-attr')).backgroundColor;
+    const m = bg.match(/rgba?\(([^)]+)\)/);
+    const parts = m[1].split(',').map(v => parseFloat(v));
+    return parts.length === 4 ? parts[3] : 1;
+  });
+  expect(alpha).toBeGreaterThanOrEqual(0.65);   // jangan terlalu bening
+  expect(alpha).toBeLessThanOrEqual(0.9);       // jangan terlalu pekat
+
+  // Kotak merah cakupan: harus terlihat jelas di atas peta inset
+  const box = await page.evaluate(() => {
+    let o = null;
+    FormalSheet.insetMap.eachLayer(l => {
+      if (l.options && l.options.fillColor === '#e01b1b') o = l.options.fillOpacity;
+    });
+    return o;
+  });
+  expect(box).toBeGreaterThanOrEqual(0.12);     // dulu 0.10 -> praktis tak terlihat
+  expect(box).toBeLessThanOrEqual(0.35);        // jangan menutupi peta inset
+});

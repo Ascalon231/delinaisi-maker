@@ -352,7 +352,8 @@ const FormalSheet = (function () {
       color: '#e01b1b',
       weight: 1.8,
       fillColor: '#e01b1b',
-      fillOpacity: 0.10,
+      // Dinaikkan dari 0.10: terlalu bening untuk terlihat di atas peta.
+      fillOpacity: 0.18,
       interactive: false
     }).addTo(insetMap);
 
