@@ -680,6 +680,10 @@ function setBasemap(id, skipSave) {
   // Kotak kredit menampilkan "Sumber data" sesuai peta dasar aktif —
   // tanpa ini atribusi bisa menyebut penyedia yang salah di laporan.
   if (typeof updateLayout === 'function') updateLayout();
+  // Bila inset disetel "sama dengan peta utama", ubah ubinnya juga.
+  if (typeof FormalSheet !== 'undefined' && FormalSheet.applyInsetOptions) {
+    FormalSheet.applyInsetOptions();
+  }
   if (!skipSave) save();
 }
 
@@ -687,6 +691,14 @@ function setBasemap(id, skipSave) {
 // Nilai awal field kop akademik (semua tetap bisa diubah user).
 const KOP_DEFAULTS = {
   programStudy: '', institution: '', logo: '', logoName: '',
+  // Diagram lokasi (inset) — semua bisa diubah user.
+  insetShow: true,
+  insetBasemap: 'light',   // light | streets | terrain | satellite | dark | follow
+  insetZoom: '4',          // seberapa jauh zoom-out dari peta utama
+  insetHeight: '150',      // px
+  insetColor: '#e01b1b',   // warna kotak cakupan
+  insetGrid: '1',          // tampilkan grid koordinat inset
+  insetLabel: 'Diagram Lokasi:',
   activityTitle: '', activityYear: String(new Date().getFullYear()),
   projection: 'Universal Transverse Mercator', zone: 'UTM 52S', datum: 'WGS 1984',
   sourceData: '', supervisorTitle: '', mapmakerName: '', mapmakerDegree: ''
@@ -716,6 +728,16 @@ const TEMPLATES = {
 // Preset yang memakai lembar formal (bukan overlay di atas peta).
 function isFormalTpl(id) { return !!(TEMPLATES[id] && TEMPLATES[id].formal); }
 
+// Selaraskan kontrol panel dengan state (dipakai saat preset formal aktif).
+function syncKopInputs() {
+  KOP_FIELDS.forEach(({ field, id }) => {
+    const el = $('#' + id);
+    if (el && layout.kop[field] != null) el.value = layout.kop[field];
+  });
+  const showEl = $('#kop-inset-show');
+  if (showEl) showEl.checked = layout.kop.insetShow !== false;
+}
+
 function applyTemplate(id) {
   if (!TEMPLATES[id]) return;
   const prev = layout.tpl;
@@ -737,6 +759,7 @@ function applyTemplate(id) {
   // Tampilkan/sembunyikan field kop
   const kopFields = $('#kop-fields');
   if (kopFields) kopFields.classList.toggle('hidden', !formal);
+  if (formal) syncKopInputs();
 
   // Checkbox overlay tidak relevan di lembar formal
   const togglesBox = $('.layout-toggles');
@@ -761,7 +784,29 @@ function applyTemplate(id) {
 const MONTHS = ['Januari','Februari','Maret','April','Mei','Juni',
                 'Juli','Agustus','September','Oktober','November','Desember'];
 
-const KOP_FIELDS = ['programStudy', 'institution', 'activityTitle', 'activityYear', 'projection', 'zone', 'datum', 'sourceData', 'supervisorTitle', 'mapmakerName', 'mapmakerDegree'];
+// Nama field state -> id elemen di HTML. Sebagian memakai kebab-case
+// (mis. insetBasemap -> #kop-inset-basemap), jadi pemetaan ini eksplisit
+// supaya tidak ada field yang diam-diam terlewat.
+const KOP_FIELDS = [
+  { field: 'programStudy',    id: 'kop-programStudy' },
+  { field: 'institution',     id: 'kop-institution' },
+  { field: 'activityTitle',   id: 'kop-activityTitle' },
+  { field: 'activityYear',    id: 'kop-activityYear' },
+  { field: 'projection',      id: 'kop-projection' },
+  { field: 'zone',            id: 'kop-zone' },
+  { field: 'datum',           id: 'kop-datum' },
+  { field: 'sourceData',      id: 'kop-sourceData' },
+  { field: 'supervisorTitle', id: 'kop-supervisorTitle' },
+  { field: 'mapmakerName',    id: 'kop-mapmakerName' },
+  { field: 'mapmakerDegree',  id: 'kop-mapmakerDegree' },
+  // Opsi diagram lokasi (inset)
+  { field: 'insetBasemap',    id: 'kop-inset-basemap' },
+  { field: 'insetZoom',       id: 'kop-inset-zoom' },
+  { field: 'insetHeight',     id: 'kop-inset-height' },
+  { field: 'insetColor',      id: 'kop-inset-color' },
+  { field: 'insetGrid',       id: 'kop-inset-grid' },
+  { field: 'insetLabel',      id: 'kop-inset-label' }
+];
 
 function formatDateID(d) {
   return d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
@@ -885,18 +930,34 @@ function bindLayout() {
   const addBtn = $('#btn-cat-add');
   if (addBtn) addBtn.addEventListener('click', addCategory);
 
-  // Kop Akademik fields
-  KOP_FIELDS.forEach(field => {
-    const el = $(`#kop-${field}`);
-    if (el) {
-      el.addEventListener('input', (e) => {
-        layout.kop = layout.kop || {};
-        layout.kop[field] = e.target.value;
-        updateLayout();
-        save();
-      });
-    }
+  // Kop Akademik fields (termasuk opsi diagram lokasi)
+  KOP_FIELDS.forEach(({ field, id }) => {
+    const el = $('#' + id);
+    if (!el) return;
+    const commit = (e) => {
+      layout.kop = layout.kop || {};
+      layout.kop[field] = e.target.value;
+      // Beberapa opsi mengubah ubin inset, bukan sekadar teks.
+      if (typeof FormalSheet !== 'undefined' && FormalSheet.applyInsetOptions) {
+        FormalSheet.applyInsetOptions();
+      }
+      updateLayout();
+      save();
+    };
+    el.addEventListener('input', commit);
+    el.addEventListener('change', commit);
   });
+
+  // Tampilkan/sembunyikan diagram lokasi
+  const showEl = $('#kop-inset-show');
+  if (showEl) {
+    showEl.checked = layout.kop.insetShow !== false;
+    showEl.addEventListener('change', (e) => {
+      layout.kop.insetShow = e.target.checked;
+      if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
+      save();
+    });
+  }
 
   const toggles = [
     ['#layout-show-legend', 'showLegend'],
@@ -1725,10 +1786,12 @@ function load() {
     if (data.layout.kop) {
       layout.kop = Object.assign({}, KOP_DEFAULTS, data.layout.kop);
     }
-    KOP_FIELDS.forEach(field => {
-      const el = $('#kop-' + field);
+    KOP_FIELDS.forEach(({ field, id }) => {
+      const el = $('#' + id);
       if (el && layout.kop[field] != null) el.value = layout.kop[field];
     });
+    const showEl = $('#kop-inset-show');
+    if (showEl) showEl.checked = layout.kop.insetShow !== false;
 
     // Terapkan template layout yang tersimpan
     if (data.layout.tpl && TEMPLATES[data.layout.tpl]) {

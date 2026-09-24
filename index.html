@@ -230,6 +230,62 @@
             </div>
             <p class="hint hint-tight" id="logo-hint">PNG/JPG/SVG, maks 1 MB. Disimpan di browser Anda.</p>
           </div>
+          <div class="field field-tight">
+            <span>Diagram lokasi (inset)</span>
+            <div class="inset-opts">
+              <label class="toggle toggle-inline">
+                <input type="checkbox" id="kop-inset-show" checked><span>Tampilkan</span>
+              </label>
+            </div>
+          </div>
+          <label class="field field-tight">
+            <span>Peta dasar inset</span>
+            <select id="kop-inset-basemap">
+              <option value="light">Minimal (terang)</option>
+              <option value="streets">Peta Jalan</option>
+              <option value="terrain">Relief</option>
+              <option value="satellite">Satelit</option>
+              <option value="dark">Gelap</option>
+              <option value="follow">Sama dengan peta utama</option>
+            </select>
+          </label>
+          <div class="kop-grid">
+            <label class="field field-tight">
+              <span>Perbesaran inset</span>
+              <select id="kop-inset-zoom">
+                <option value="2">Sangat luas (negara)</option>
+                <option value="4" selected>Luas (provinsi)</option>
+                <option value="6">Sedang</option>
+                <option value="8">Dekat (kabupaten)</option>
+              </select>
+            </label>
+            <label class="field field-tight">
+              <span>Tinggi inset</span>
+              <select id="kop-inset-height">
+                <option value="110">Pendek</option>
+                <option value="150" selected>Sedang</option>
+                <option value="200">Tinggi</option>
+              </select>
+            </label>
+          </div>
+          <div class="kop-grid">
+            <label class="field field-tight">
+              <span>Warna kotak cakupan</span>
+              <input type="color" id="kop-inset-color" value="#e01b1b" class="inset-color">
+            </label>
+            <label class="field field-tight">
+              <span>Garis batas inset</span>
+              <select id="kop-inset-grid">
+                <option value="1" selected>Tampilkan grid</option>
+                <option value="0">Tanpa grid</option>
+              </select>
+            </label>
+          </div>
+          <label class="field field-tight">
+            <span>Judul diagram lokasi</span>
+            <input id="kop-inset-label" type="text" value="Diagram Lokasi:" maxlength="40">
+          </label>
+
           <div class="kop-grid">
             <label class="field field-tight">
               <span>Nama pembuat peta</span>

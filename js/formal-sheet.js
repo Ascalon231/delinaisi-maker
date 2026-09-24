@@ -119,8 +119,8 @@ const FormalSheet = (function () {
     panel.appendChild(bRef);
 
     // 6. Diagram lokasi (inset)
-    const bInset = el('div', 'fl-block');
-    const insetHead = el('div', 'fl-head', 'Diagram Lokasi:');
+    const bInset = el('div', 'fl-block fl-inset-block');
+    const insetHead = el('div', 'fl-head fl-inset-head', 'Diagram Lokasi:');
     const insetWrap = el('div', 'fl-inset-wrap');
     const insetDiv = el('div', 'fl-inset-map');
     insetDiv.id = 'fl-inset-map';
@@ -314,6 +314,22 @@ const FormalSheet = (function () {
     FormalLayout.drawGraticule(ctx, map, { x: w, y: h }, { margin: 0 });
   }
 
+  /* -------------------- Preferensi inset (dari input user) ------------- */
+  function kop() { return (typeof layout !== 'undefined' && layout.kop) || {}; }
+
+  // URL ubin inset sesuai pilihan user. Semua sumber bebas API key; untuk
+  // 'follow' dipakai peta dasar utama, dan 'none' jatuh ke Minimal.
+  function insetTileUrl() {
+    const want = kop().insetBasemap || 'light';
+    const id = (want === 'follow') ? (typeof currentBasemap !== 'undefined' ? currentBasemap : 'light') : want;
+    const safe = (id === 'none' || !id) ? 'light' : id;
+    const bm = (typeof BASEMAPS !== 'undefined') ? BASEMAPS[safe] : null;
+    if (bm && bm._url) return bm._url;
+    return 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+  }
+
+  function insetColor() { return kop().insetColor || '#e01b1b'; }
+
   /* -------------------- Inset map + bounding box -------------------- */
   function initInset() {
     if (insetReady) return;
@@ -332,16 +348,7 @@ const FormalSheet = (function () {
       tap: false
     });
 
-    // Inset memakai sumber ubin yang sama dengan peta utama (semua tanpa
-    // API key), tapi selalu versi terang/polos agar kotak merah cakupan
-    // mudah terlihat. Untuk basemap 'none', inset pakai Minimal.
-    const src = (typeof BASEMAPS !== 'undefined' && BASEMAPS.light)
-      ? BASEMAPS.light
-      : null;
-    const url = src && src._url
-      ? src._url
-      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-    insetLayer = L.tileLayer(url, {
+    insetLayer = L.tileLayer(insetTileUrl(), {
       maxZoom: 19,
       subdomains: 'abcd',
       crossOrigin: true
@@ -349,10 +356,9 @@ const FormalSheet = (function () {
 
     insetMap.setView([-2.5, 118], 5);
     insetBox = L.rectangle([[0, 0], [0, 0]], {
-      color: '#e01b1b',
+      color: insetColor(),
       weight: 1.8,
-      fillColor: '#e01b1b',
-      // Dinaikkan dari 0.10: terlalu bening untuk terlihat di atas peta.
+      fillColor: insetColor(),
       fillOpacity: 0.18,
       interactive: false
     }).addTo(insetMap);
@@ -371,12 +377,45 @@ const FormalSheet = (function () {
       const b = map.getBounds();
       insetBox.setBounds(b);
 
-      // Area kajian selalu terlihat, tapi inset tetap lebih luas dari peta utama.
-      const zoomOut = Math.max(2, Math.min(map.getZoom() - 4, 9));
+      // Seberapa jauh zoom-out ditentukan user (default 4 = skala provinsi).
+      const out = parseInt(kop().insetZoom, 10);
+      const step = isFinite(out) ? out : 4;
+      const zoomOut = Math.max(2, Math.min(map.getZoom() - step, 12));
       insetMap.setView(b.getCenter(), zoomOut, { animate: false });
       // Grid inset ikut berubah saat cakupan berubah.
       refreshInsetGraticule();
     } catch (e) { /* diabaikan */ }
+  }
+
+  // Terapkan preferensi tampilan inset (tinggi, tampil/sembunyi, judul).
+  function applyInsetPrefs() {
+    const k = kop();
+
+    const wrap = document.querySelector('.fl-inset-wrap');
+    if (wrap) {
+      const h = parseInt(k.insetHeight, 10);
+      wrap.style.height = (isFinite(h) ? h : 150) + 'px';
+    }
+
+    const block = document.querySelector('.fl-inset-block');
+    const head = document.querySelector('.fl-inset-head');
+    const show = k.insetShow !== false;
+    if (block) block.style.display = show ? '' : 'none';
+    if (head) {
+      const label = (k.insetLabel == null ? 'Diagram Lokasi:' : k.insetLabel).trim();
+      head.textContent = label;
+      head.style.display = label ? '' : 'none';
+    }
+
+    // Grid inset bisa dimatikan.
+    const g = document.getElementById('fl-inset-graticule');
+    const wantGrid = String(k.insetGrid !== '0');
+    if (g) g.style.display = (show && wantGrid === 'true') ? '' : 'none';
+
+    if (insetBox) {
+      const c = insetColor();
+      insetBox.setStyle({ color: c, fillColor: c });
+    }
   }
 
   /* -------------------- Graticule inset -------------------- */
@@ -385,6 +424,8 @@ const FormalSheet = (function () {
   function refreshInsetGraticule() {
     const cvs = document.getElementById('fl-inset-graticule');
     if (!cvs || !insetReady || !insetMap) return;
+    if (String(kop().insetGrid) === '0') { cvs.style.display = 'none'; return; }
+    cvs.style.display = '';
 
     const wrap = cvs.parentNode;
     if (!wrap) return;
@@ -504,6 +545,7 @@ const FormalSheet = (function () {
   /* -------------------- Penyegaran menyeluruh -------------------- */
   function refresh() {
     if (!installed) return;
+    applyInsetPrefs();
     fillText();
     refreshScaleBar();
     refreshGraticule();
@@ -588,6 +630,20 @@ const FormalSheet = (function () {
 
     refresh: refresh,
     scheduleRefresh: scheduleRefresh,
+
+    // Dipanggil saat user mengubah opsi inset: ganti ubin bila perlu.
+    applyInsetOptions: function () {
+      if (!installed) return;
+      const wantUrl = insetTileUrl();
+      if (insetLayer && insetLayer._url !== wantUrl) {
+        try { insetMap.removeLayer(insetLayer); } catch (e) {}
+        insetLayer = L.tileLayer(wantUrl, {
+          maxZoom: 19, subdomains: 'abcd', crossOrigin: true
+        }).addTo(insetMap);
+        if (insetBox) insetBox.bringToFront();
+      }
+      scheduleRefresh();
+    },
 
     get insetMap() { return insetMap; },
     isInstalled: function () { return installed; }

@@ -1472,3 +1472,173 @@ test('transparansi: atribusi inset & kotak cakupan tidak ekstrem', async ({ page
   expect(box).toBeGreaterThanOrEqual(0.12);     // dulu 0.10 -> praktis tak terlihat
   expect(box).toBeLessThanOrEqual(0.35);        // jangan menutupi peta inset
 });
+
+/* ============================================================
+   Diagram lokasi (inset) yang bisa dikustom
+   ============================================================ */
+
+// Setiap field #kop-* harus benar-benar terpasang ke state. Ini menjaga
+// bug lama: nama field camelCase vs id kebab-case membuat beberapa field
+// diam-diam terlewat tanpa error.
+test('inset: setiap kontrol terpasang ke state (id tidak mismatch)', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1200);
+
+  // Semua id yang dipakai KOP_FIELDS harus ada di DOM
+  const missing = await page.evaluate(() => KOP_FIELDS
+    .filter(({ id }) => !document.querySelector('#' + id))
+    .map(({ id }) => id));
+  expect(missing).toEqual([]);
+
+  // Ubah tiap kontrol, pastikan nilai sampai ke state
+  const cases = [
+    ['#kop-inset-basemap', 'satellite', 'insetBasemap'],
+    ['#kop-inset-zoom',    '8',         'insetZoom'],
+    ['#kop-inset-height',  '200',       'insetHeight'],
+    ['#kop-inset-grid',    '0',         'insetGrid'],
+    ['#kop-programStudy',  'PWK',       'programStudy']
+  ];
+  for (const [sel, val, key] of cases) {
+    await page.locator(sel).selectOption(val).catch(async () => {
+      await page.locator(sel).fill(val);
+    });
+    await page.waitForTimeout(350);
+    expect(await page.evaluate(k => layout.kop[k], key)).toBe(val);
+  }
+
+  // Input warna
+  await page.evaluate(() => {
+    const c = document.querySelector('#kop-inset-color');
+    c.value = '#1d4ed8';
+    c.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => layout.kop.insetColor)).toBe('#1d4ed8');
+});
+
+test('inset: peta dasar, tinggi, grid, judul & kotak cakupan bisa diubah', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+
+  const snap = () => page.evaluate(() => ({
+    tinggi: Math.round(document.querySelector('.fl-inset-wrap').getBoundingClientRect().height),
+    judul: document.querySelector('.fl-inset-head').textContent,
+    kotak: (() => { let v = null; FormalSheet.insetMap.eachLayer(l => {
+      if (l.options && l.options.fillColor) v = l.options.fillColor; }); return v; })(),
+    grid: getComputedStyle(document.querySelector('#fl-inset-graticule')).display !== 'none',
+    url: (() => { let u = null; FormalSheet.insetMap.eachLayer(l => { if (l._url) u = l._url; }); return u; })()
+  }));
+
+  const a = await snap();
+  expect(a.tinggi).toBe(150);
+  expect(a.judul).toBe('Diagram Lokasi:');
+  expect(a.grid).toBe(true);
+
+  // Ubah semuanya
+  await page.locator('#kop-inset-basemap').selectOption('satellite');
+  await page.waitForTimeout(900);
+  await page.locator('#kop-inset-height').selectOption('200');
+  await page.waitForTimeout(500);
+  await page.locator('#kop-inset-grid').selectOption('0');
+  await page.waitForTimeout(500);
+  await page.locator('#kop-inset-label').fill('LOKASI KAJIAN');
+  await page.waitForTimeout(500);
+  await page.evaluate(() => {
+    const c = document.querySelector('#kop-inset-color');
+    c.value = '#1d4ed8';
+    c.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(800);
+
+  const b = await snap();
+  expect(b.tinggi).toBe(200);
+  expect(b.judul).toBe('LOKASI KAJIAN');
+  expect(b.kotak.toLowerCase()).toBe('#1d4ed8');
+  expect(b.grid).toBe(false);
+  expect(b.url).not.toBe(a.url);                 // ubin inset benar-benar berganti
+  expect(b.url).toContain('arcgisonline');       // satelit
+});
+
+test('inset: bisa disembunyikan & opsi tersimpan setelah reload', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+
+  await page.locator('#kop-inset-label').fill('PETA LOKASI');
+  await page.locator('#kop-inset-height').selectOption('110');
+  await page.waitForTimeout(600);
+
+  // Sembunyikan
+  await page.locator('#kop-inset-show').uncheck();
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.fl-inset-block')).display)).toBe('none');
+
+  // Tampilkan lagi
+  await page.locator('#kop-inset-show').check();
+  await page.waitForTimeout(700);
+  expect(await page.evaluate(() =>
+    getComputedStyle(document.querySelector('.fl-inset-block')).display)).not.toBe('none');
+
+  const stored = await page.evaluate(() => JSON.parse(
+    localStorage.getItem('delinaisi-maker-v1')).layout.kop);
+  expect(stored.insetLabel).toBe('PETA LOKASI');
+  expect(stored.insetHeight).toBe('110');
+
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d),
+    await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1')));
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2200);
+
+  await expect(page.locator('#kop-inset-label')).toHaveValue('PETA LOKASI');
+  await expect(page.locator('#kop-inset-height')).toHaveValue('110');
+  await expect(page.locator('.fl-inset-head')).toHaveText('PETA LOKASI');
+  expect(await page.evaluate(() =>
+    Math.round(document.querySelector('.fl-inset-wrap').getBoundingClientRect().height))).toBe(110);
+});
+
+test('inset: mode "sama dengan peta utama" ikut berubah saat peta dasar diganti', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+
+  await page.locator('#kop-inset-basemap').selectOption('follow');
+  await page.waitForTimeout(900);
+
+  const urls = () => page.evaluate(() => ({
+    utama: BASEMAPS[currentBasemap]._url,
+    inset: (() => { let u = null; FormalSheet.insetMap.eachLayer(l => { if (l._url) u = l._url; }); return u; })()
+  }));
+
+  // Ganti peta dasar utama -> inset harus mengikuti
+  await page.locator('[data-basemap="terrain"]').click();
+  await page.waitForTimeout(1500);
+  let u = await urls();
+  expect(u.inset).toBe(u.utama);
+  expect(u.inset).toContain('World_Topo_Map');
+
+  await page.locator('[data-basemap="dark"]').click();
+  await page.waitForTimeout(1500);
+  u = await urls();
+  expect(u.inset).toBe(u.utama);
+
+  // Mode 'none' pada peta utama: inset jatuh ke Minimal supaya tetap terlihat
+  await page.locator('[data-basemap="none"]').click();
+  await page.waitForTimeout(1500);
+  u = await urls();
+  expect(u.inset).not.toBe('');
+  expect(u.inset).toContain('cartocdn');
+});
