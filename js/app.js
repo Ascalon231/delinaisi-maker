@@ -214,7 +214,17 @@ function fmtLen(m) {
   if (m < 1000) return m.toLocaleString('id-ID', { maximumFractionDigits: 0 }) + ' m';
   return (m / 1000).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km';
 }
-function fmtCoord(c) { return c[0].toFixed(5) + '°, ' + c[1].toFixed(5) + '°'; }
+// Koordinat gaya Indonesia: koma desimal + arah mata angin (LU/LS/BT/BB).
+// Sebelumnya memakai titik desimal tanpa arah, sehingga kurang jelas bagi
+// pembaca laporan di Indonesia.
+function fmtCoord(c) {
+  const lat = Number(c[0]), lng = Number(c[1]);
+  if (!isFinite(lat) || !isFinite(lng)) return '—';
+  const arahLat = lat >= 0 ? 'LU' : 'LS';
+  const arahLng = lng >= 0 ? 'BT' : 'BB';
+  return Math.abs(lat).toFixed(5).replace('.', ',') + '° ' + arahLat +
+         ', ' + Math.abs(lng).toFixed(5).replace('.', ',') + '° ' + arahLng;
+}
 
 /* -------------------- Pengukuran (Turf.js) -------------------- */
 function computeMeasure(layer, type) {
@@ -421,7 +431,7 @@ function popupHTML(f) {
     (rows ? '<div style="background:#f2f6fd;border:1px solid #dbe5fb;border-radius:8px;padding:6px 8px;margin-bottom:7px">' + rows + '</div>' : '') +
     (f.desc ? '<div style="color:#5b6879;margin-bottom:6px">' + esc(f.desc) + '</div>' : '') +
     '<div style="margin-top:8px;display:flex;gap:6px">' +
-      '<button class="btn btn-secondary btn-sm" data-act="edit">Edit</button>' +
+      '<button class="btn btn-secondary btn-sm" data-act="edit">Ubah</button>' +
       '<button class="btn btn-danger-ghost btn-sm" data-act="del">Hapus</button>' +
     '</div>'
   );
@@ -438,7 +448,6 @@ function renderList() {
   list.innerHTML = '';
   $('#feat-count').textContent = features.length;
   $('#feat-empty').style.display = features.length ? 'none' : '';
-  updateLegend();
   refreshAllLabels();
   // Hitungan "n fitur" dan tombol hapus di panel warna ikut berubah.
   if (typeof renderCategoryColors === 'function') renderCategoryColors();
@@ -763,30 +772,26 @@ const KOP_DEFAULTS = {
 
 const layout = {
   title: '', author: '',
-  showLegend: true, showNorth: true, showScale: true, showCredit: true,
   // Nama fitur ditampilkan di peta (label permanen), bukan hanya di popup.
   showLabels: true,
-  tpl: 'klasik',
+  tpl: 'formal',
   kop: Object.assign({}, KOP_DEFAULTS)
 };
 
-// Template layout mengikuti konvensi QGIS/ArcGIS:
-// - klasik: judul tengah-atas, elemen menyebar (default QGIS)
-// - rapat:  semua elemen di sisi kanan (gaya ArcGIS minimal)
-// - modal:  judul di tengah-bawah (gaya peta akademik modern)
-// - bersih: hanya judul + legenda + skala
+// Layout peta: HANYA lembar "Kop Akademik".
+// Preset lain (Klasik, Rapat Kanan, Judul Bawah, Bersih) dihapus dulu:
+// tempatnya di atas peta (overlay) tidak dipakai lagi dan hasil cetaknya
+// tidak sebersih lembar kop. Semua teks peta masuk ke panel lembar ini.
 const TEMPLATES = {
-  klasik: { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true,  showLabels: true  },
-  rapat:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true,  showLabels: true  },
-  modal:  { showLegend: true,  showNorth: true,  showScale: true,  showCredit: true,  showLabels: true  },
-  // Bersih: tanpa label agar peta benar-benar bersih.
-  bersih: { showLegend: true,  showNorth: false, showScale: true,  showCredit: false, showLabels: false },
-  // Preset ke-5: lembar formal 2 kolom (peta + panel kop). Semua teks dari input user.
-  formal: { showLegend: false, showNorth: false, showScale: false, showCredit: false, showLabels: true, formal: true }
+  formal: { showLabels: true, formal: true }
 };
 
-// Preset yang memakai lembar formal (bukan overlay di atas peta).
+// Preset yang memakai lembar kop (bukan overlay di atas peta).
 function isFormalTpl(id) { return !!(TEMPLATES[id] && TEMPLATES[id].formal); }
+
+// Id preset yang tidak dikenal (mis. dari berkas proyek versi lama) jatuh
+// ke lembar kop supaya aplikasi tidak pernah kehilangan tata letak.
+function normalizeTplId(id) { return TEMPLATES[id] ? id : 'formal'; }
 
 // Selaraskan kontrol panel dengan state (dipakai saat preset formal aktif).
 function syncKopInputs() {
@@ -798,47 +803,29 @@ function syncKopInputs() {
   if (showEl) showEl.checked = layout.kop.insetShow !== false;
 }
 
+// Pasang layout lembar kop. Hanya ada satu preset, tapi fungsi ini tetap
+// dipakai saat memuat data tersimpan / mengimpor berkas proyek.
 function applyTemplate(id) {
-  if (!TEMPLATES[id]) return;
-  const prev = layout.tpl;
-  layout.tpl = id;
-  const t = TEMPLATES[id];
-  // Preset formal (Kop Akademik) memakai lembar sendiri, bukan overlay.
-  if (!t.formal) {
-    layout.showLegend = t.showLegend;
-    layout.showNorth = t.showNorth;
-    layout.showScale = t.showScale;
-    layout.showCredit = t.showCredit;
-    layout.showLabels = t.showLabels !== false;
-  }
+  const tpl = normalizeTplId(id);
+  const t = TEMPLATES[tpl];
+  layout.tpl = tpl;
+  layout.showLabels = t.showLabels !== false;
 
-  const formal = !!t.formal;
   const wrap = $('#map-wrap');
-  wrap.className = 'tpl-' + id + (!formal && layout.title.trim() ? ' has-title' : '');
-  $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === id));
+  wrap.className = 'tpl-' + tpl;
+  $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === tpl));
 
-  // Tampilkan/sembunyikan field kop
+  // Field kop selalu dipakai: seluruh teks peta berasal dari sini.
   const kopFields = $('#kop-fields');
-  if (kopFields) kopFields.classList.toggle('hidden', !formal);
-  if (formal) syncKopInputs();
+  if (kopFields) kopFields.classList.remove('hidden');
+  syncKopInputs();
 
-  // Checkbox overlay tidak relevan di lembar formal
-  const togglesBox = $('.layout-toggles');
-  if (togglesBox) togglesBox.classList.toggle('hidden', formal);
-
-  // Sinkronkan checkbox di panel
-  const map = { showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
-                showScale: '#layout-show-scale', showCredit: '#layout-show-credit',
-                showLabels: '#layout-show-labels' };
-  Object.keys(map).forEach(k => { if ($(map[k])) $(map[k]).checked = !!layout[k]; });
+  const labelToggle = $('#layout-show-labels');
+  if (labelToggle) labelToggle.checked = !!layout.showLabels;
   refreshAllLabels();
 
-  // Pasang / lepas lembar formal
-  if (formal) {
-    FormalSheet.activate();
-  } else if (prev !== id || !formal) {
-    FormalSheet.deactivate();
-  }
+  // Bangun / segarkan lembar kop.
+  FormalSheet.activate();
 
   updateLayout();
   save();
@@ -890,89 +877,12 @@ function basemapAttribution(id) {
   return m[id] || 'OpenStreetMap';
 }
 
-function updateLegend() {  const legendEl = $('#map-legend');
-  if (!legendEl) return;
-  const listEl = $('#map-legend-list');
-  listEl.innerHTML = '';
-
-  // Hitung kategori yang terpakai, beserta jenis geometri dominannya.
-  const used = {};
-  features.forEach(f => {
-    if (!used[f.category]) used[f.category] = { points: 0, lines: 0, polys: 0 };
-    if (f.type === 'Marker') used[f.category].points++;
-    else if (f.type === 'Polyline') used[f.category].lines++;
-    else used[f.category].polys++;
-  });
-
-  Object.keys(used).forEach(catId => {
-    const cat = catOf(catId);
-    const u = used[catId];
-    const total = u.points + u.lines + u.polys;
-    let shape = 'poly', label = cat.label;
-    if (u.polys === 0 && u.lines === 0) shape = 'dot';
-    else if (u.polys === 0 && u.points === 0) shape = 'line';
-
-    const item = document.createElement('div');
-    item.className = 'legend-item';
-    item.innerHTML =
-      '<span class="legend-swatch ' + shape + '" style="' +
-        (shape === 'line' ? 'border-color:' + cat.color : 'background:' + cat.color) +
-      '"></span>' +
-      '<span class="legend-label">' + esc(label) + '</span>' +
-      '<span class="legend-count">' + total + '</span>';
-    listEl.appendChild(item);
-  });
-
-  if (!listEl.children.length) {
-    listEl.innerHTML = '<div class="legend-empty">Belum ada fitur.</div>';
-  }
-  legendEl.classList.toggle('hidden', !layout.showLegend);
-}
-
+// Seluruh elemen peta (judul, legenda, skala, arah utara, kredit) digambar
+// oleh lembar kop (js/formal-sheet.js), jadi di sini cukup memintanya
+// menyegarkan diri setiap state berubah.
 function updateLayout() {
-  const formal = isFormalTpl(layout.tpl);
-
-  // Judul
-  const titleEl = $('#map-title');
-  titleEl.textContent = layout.title;
-  const hasTitle = !!layout.title.trim();
-  titleEl.classList.toggle('hidden', !hasTitle);
-  // Saat judul tampil, kotak pencarian digeser ke bawah (lihat css/style.css).
-  // Pertahankan class template (tpl-*).
-  const wrap = $('#map-wrap');
-  if (!formal) {
-    wrap.classList.toggle('has-title', hasTitle);
-  } else {
-    wrap.classList.remove('has-title');
-  }
-  if (!wrap.className.match(/tpl-\w+/)) wrap.classList.add('tpl-' + (layout.tpl || 'klasik'));
-
-  // Kredit (nama, tanggal, sumber data, sistem koordinat)
-  const creditEl = $('#map-credit');
-  const hasAuthor = !!layout.author.trim();
-  $('#map-credit-author').textContent = hasAuthor ? 'Dibuat oleh: ' + layout.author.trim() : '';
-  $('#map-credit-date').textContent = 'Tanggal: ' + formatDateID(new Date());
-  $('#map-credit-source').textContent = 'Sumber data: ' + basemapAttribution(currentBasemap);
-  $('#map-credit-crs').textContent = 'Sistem koordinat: WGS 84 (EPSG:4326)';
-  creditEl.classList.toggle('hidden', !layout.showCredit || !hasAuthor);
-
-  // Legenda
-  updateLegend();
-
-  // Arah utara
-  $('#map-north').classList.toggle('hidden', !layout.showNorth);
-
-  // Skala: pakai kontrol bawaan Leaflet, toggle tampil
-  const scaleCtl = map.__scaleControl;
-  if (scaleCtl) {
-    const el = scaleCtl.getContainer();
-    if (el) el.style.display = (layout.showScale && !formal) ? '' : 'none';
-  }
-
-  // Lembar formal: segarkan isi panel (teks kop, legenda, skala, inset)
-  if (formal && typeof FormalSheet !== 'undefined') {
-    FormalSheet.scheduleRefresh();
-  }
+  if (typeof FormalSheet === 'undefined' || !FormalSheet.isInstalled()) return;
+  FormalSheet.scheduleRefresh();
 }
 
 function bindLayout() {
@@ -1022,24 +932,16 @@ function bindLayout() {
     });
   }
 
-  const toggles = [
-    ['#layout-show-legend', 'showLegend'],
-    ['#layout-show-north', 'showNorth'],
-    ['#layout-show-scale', 'showScale'],
-    ['#layout-show-credit', 'showCredit'],
-    ['#layout-show-labels', 'showLabels']
-  ];
-  toggles.forEach(([sel, key]) => {
-    const el = $(sel);
-    if (!el) return;
-    el.addEventListener('change', (e) => {
-      layout[key] = e.target.checked;
-      // Label perlu dipasang/dilepas langsung di tiap fitur.
-      if (key === 'showLabels') refreshAllLabels();
-      updateLayout();
+  // Nama fitur di peta (label permanen) — satu-satunya opsi overlay yang
+  // masih relevan; legenda/skala/utara/kredit digambar oleh lembar kop.
+  const labelToggle = $('#layout-show-labels');
+  if (labelToggle) {
+    labelToggle.addEventListener('change', (e) => {
+      layout.showLabels = e.target.checked;
+      refreshAllLabels();
       save();
     });
-  });
+  }
 
   // Pemilih template layout
   $$('#tpl-row button').forEach(b => {
@@ -1745,10 +1647,6 @@ function restoreProject(proj) {
   if (L2 && typeof L2 === 'object') {
     layout.title = L2.title || '';
     layout.author = L2.author || '';
-    layout.showLegend = L2.showLegend !== false;
-    layout.showNorth = L2.showNorth !== false;
-    layout.showScale = L2.showScale !== false;
-    layout.showCredit = L2.showCredit !== false;
     layout.showLabels = L2.showLabels !== false;
     layout.kop = Object.assign({}, KOP_DEFAULTS, L2.kop || {});
     dipulihkan = true;
@@ -1761,8 +1659,10 @@ function restoreProject(proj) {
     try { map.setView([proj.view.lat, proj.view.lng], proj.view.zoom); } catch (e) {}
   }
 
-  // Terapkan preset terakhir (termasuk lembar formal bila itu yang dipakai).
-  const tpl = (proj.tpl && TEMPLATES[proj.tpl]) ? proj.tpl : null;
+  // Terapkan layout terakhir. Berkas proyek lama menyimpan preset yang
+  // sudah dihapus (mis. "klasik") -> normalizeTplId mengembalikannya ke
+  // lembar kop, jadi berkas lama tetap bisa dibuka.
+  const tpl = normalizeTplId(proj.tpl);
 
   // Sinkronkan kontrol panel dengan state yang baru dipulihkan.
   const t = $('#layout-title'); if (t) t.value = layout.title;
@@ -1775,17 +1675,7 @@ function restoreProject(proj) {
   if (showEl) showEl.checked = layout.kop.insetShow !== false;
   renderLogoPreview();
 
-  if (tpl) {
-    applyTemplate(tpl);
-  } else {
-    const tg = {
-      showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
-      showScale: '#layout-show-scale', showCredit: '#layout-show-credit',
-      showLabels: '#layout-show-labels'
-    };
-    Object.keys(tg).forEach(k => { const el = $(tg[k]); if (el) el.checked = !!layout[k]; });
-    refreshAllLabels();
-  }
+  applyTemplate(tpl);
 
   renderCategoryColors();
   renderCategorySelect();
@@ -1866,8 +1756,6 @@ function exportGeoJSON() {
       tpl: layout.tpl,
       layout: {
         title: layout.title, author: layout.author,
-        showLegend: layout.showLegend, showNorth: layout.showNorth,
-        showScale: layout.showScale, showCredit: layout.showCredit,
         showLabels: layout.showLabels,
         kop: Object.assign({}, layout.kop)
       },
@@ -1914,9 +1802,13 @@ function exportGeoJSON() {
 function exportCSV() {
   if (!features.length) { toast('Belum ada fitur untuk diekspor'); return; }
 
+  // Header memakai istilah Indonesia agar langsung terbaca di laporan.
+  // Kolom koordinat sengaja berupa ANGKA desimal (koma gaya Indonesia) tanpa
+  // akhiran LU/LS/BT/BB, supaya tetap bisa dihitung & diurutkan di Excel.
+  // Arah mata angin disediakan sebagai kolom terpisah.
   const head = ['No', 'Nama', 'Jenis Delinasi', 'Tipe', 'Keterangan',
     'Luas (m2)', 'Luas (ha)', 'Keliling (m)', 'Panjang (m)', 'Radius (m)',
-    'Latitude', 'Longitude'];
+    'Lintang', 'Bujur', 'Arah'];
 
   const num = (v, desimal) => (v == null || !isFinite(v))
     ? '' : v.toFixed(desimal == null ? 2 : desimal).replace('.', ',');
@@ -1924,11 +1816,12 @@ function exportCSV() {
   const baris = features.map((f, i) => {
     const m = f.measure || {};
     const cat = catOf(f.category);
-    let lat = '', lng = '';
+    let lat = '', lng = '', arah = '';
     try {
       const c = f.type === 'Marker' ? f.layer.getLatLng()
         : (f.type === 'Circle' ? f.layer.getLatLng() : f.layer.getBounds().getCenter());
-      lat = num(c.lat, 6); lng = num(c.lng, 6);
+      lat = num(Math.abs(c.lat), 6); lng = num(Math.abs(c.lng), 6);
+      arah = (c.lat >= 0 ? 'LU' : 'LS') + '/' + (c.lng >= 0 ? 'BT' : 'BB');
     } catch (e) { /* biarkan kosong */ }
     return [
       i + 1,
@@ -1941,7 +1834,7 @@ function exportCSV() {
       m.perimeter != null ? num(m.perimeter) : '',
       m.length != null ? num(m.length) : '',
       m.radius != null ? num(m.radius) : '',
-      lat, lng
+      lat, lng, arah
     ];
   });
 
@@ -1966,36 +1859,9 @@ function downloadBlob(blob, filename) {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 300);
 }
 
-function exportPNG() {
-  if (typeof html2canvas === 'undefined') { toast('Pustaka gambar belum termuat'); return; }
-
-  // Target: seluruh area peta termasuk elemen layout (judul, legenda, dst).
-  const target = $('#map-wrap');
-  const hideDuringExport = ['#search-box', '#coord-badge', '#measure-badge', '.leaflet-control-zoom'];
-  const hidden = [];
-  hideDuringExport.forEach(sel => {
-    const el = $(sel);
-    if (el && el.style.display !== 'none') { el.style.display = 'none'; hidden.push(el); }
-  });
-  toast('Membuat gambar peta…');
-
-  html2canvas(target, {
-    useCORS: true, allowTaint: false, logging: false,
-    backgroundColor: '#dfe7ef',
-    windowWidth: target.offsetWidth,
-    windowHeight: target.offsetHeight
-  }).then(canvas => {
-    hidden.forEach(el => { el.style.display = ''; });
-    canvas.toBlob(blob => {
-      downloadBlob(blob, 'peta-delinasi.png');
-      toast('Gambar PNG tersimpan');
-    }, 'image/png');
-  }).catch(err => {
-    hidden.forEach(el => { el.style.display = ''; });
-    console.error(err);
-    toast('Gagal membuat gambar: ' + (err.message || err));
-  });
-}
+/* Catatan: ekspor PNG & cetak PDF ditangani js/print-layout.js
+   (PaperLayout). Jangan menambah jalur ekspor lain di sini supaya
+   pengaturan ketajaman & pembekuan ukuran lembar tetap satu sumber. */
 
 /* -------------------- Simpan / muat (localStorage) -------------------- */
 let saveFlashTimer;
@@ -2015,8 +1881,6 @@ function buildState() {
       v: 1, seq: idSeq, basemap: currentBasemap,
       view: { lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() },
       layout: { title: layout.title, author: layout.author,
-                showLegend: layout.showLegend, showNorth: layout.showNorth,
-                showScale: layout.showScale, showCredit: layout.showCredit,
                 showLabels: layout.showLabels,
                 tpl: layout.tpl,
                 kop: Object.assign({}, layout.kop) },
@@ -2045,8 +1909,6 @@ function save(label) {
       v: 1, seq: idSeq, basemap: currentBasemap,
       view: { lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() },
       layout: { title: layout.title, author: layout.author,
-                showLegend: layout.showLegend, showNorth: layout.showNorth,
-                showScale: layout.showScale, showCredit: layout.showCredit,
                 showLabels: layout.showLabels,
                 tpl: layout.tpl,
                 kop: Object.assign({}, layout.kop) },
@@ -2098,21 +1960,11 @@ function load() {
   if (data.layout) {
     layout.title = data.layout.title || '';
     layout.author = data.layout.author || '';
-    layout.showLegend = data.layout.showLegend !== false;
-    layout.showNorth = data.layout.showNorth !== false;
-    layout.showScale = data.layout.showScale !== false;
-    layout.showCredit = data.layout.showCredit !== false;
     layout.showLabels = data.layout.showLabels !== false;
     const t = $('#layout-title'); if (t) t.value = layout.title;
     const a = $('#layout-author'); if (a) a.value = layout.author;
-    const tg = {
-      showLegend: '#layout-show-legend', showNorth: '#layout-show-north',
-      showScale: '#layout-show-scale', showCredit: '#layout-show-credit',
-      showLabels: '#layout-show-labels'
-    };
-    Object.keys(tg).forEach(k => {
-      const el = $(tg[k]); if (el) el.checked = !!layout[k];
-    });
+    const labelToggle = $('#layout-show-labels');
+    if (labelToggle) labelToggle.checked = !!layout.showLabels;
     // Pulihkan field kop akademik
     if (data.layout.kop) {
       layout.kop = Object.assign({}, KOP_DEFAULTS, data.layout.kop);
@@ -2124,12 +1976,10 @@ function load() {
     const showEl = $('#kop-inset-show');
     if (showEl) showEl.checked = layout.kop.insetShow !== false;
 
-    // Terapkan template layout yang tersimpan
-    if (data.layout.tpl && TEMPLATES[data.layout.tpl]) {
-      layout.tpl = data.layout.tpl;
-      $('#map-wrap').classList.add('tpl-' + layout.tpl);
-      $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === layout.tpl));
-    }
+    // Layout tersimpan. Data lama bisa memuat preset yang sudah dihapus.
+    layout.tpl = normalizeTplId(data.layout.tpl);
+    $('#map-wrap').classList.add('tpl-' + layout.tpl);
+    $$('#tpl-row button').forEach(b => b.classList.toggle('active', b.dataset.tpl === layout.tpl));
   }
 
   // Pulihkan kategori: daftar lengkap bila ada (menyimpan nama kustom &
@@ -2254,21 +2104,20 @@ function applySnapshot(raw) {
       const L2 = data.layout;
       layout.title = L2.title || '';
       layout.author = L2.author || '';
-      layout.showLegend = L2.showLegend !== false;
-      layout.showNorth = L2.showNorth !== false;
-      layout.showScale = L2.showScale !== false;
-      layout.showCredit = L2.showCredit !== false;
       layout.showLabels = L2.showLabels !== false;
       layout.kop = Object.assign({}, KOP_DEFAULTS, L2.kop || {});
       const t = $('#layout-title'); if (t) t.value = layout.title;
       const a = $('#layout-author'); if (a) a.value = layout.author;
+      const labelToggle = $('#layout-show-labels');
+      if (labelToggle) labelToggle.checked = !!layout.showLabels;
       KOP_FIELDS.forEach(({ field, id }) => {
         const el = $('#' + id);
         if (el && layout.kop[field] != null) el.value = layout.kop[field];
       });
       const showEl = $('#kop-inset-show');
       if (showEl) showEl.checked = layout.kop.insetShow !== false;
-      if (L2.tpl && TEMPLATES[L2.tpl]) layout.tpl = L2.tpl;
+      // Langkah riwayat lama bisa memuat preset yang sudah dihapus.
+      layout.tpl = normalizeTplId(L2.tpl);
     }
 
     // Fitur
@@ -2300,13 +2149,9 @@ function applySnapshot(raw) {
     renderCategorySelect();
     renderLogoPreview();
 
-    // Preset formal perlu dipasang/dilepas sesuai state
-    if (isFormalTpl(layout.tpl)) {
-      if (!document.querySelector('.formal-sheet')) applyTemplate(layout.tpl);
-      else if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
-    } else if (document.querySelector('.formal-sheet')) {
-      applyTemplate(layout.tpl);
-    }
+    // Lembar kop dipasang dari state (satu-satunya layout aplikasi).
+    if (!document.querySelector('.formal-sheet')) applyTemplate(layout.tpl);
+    else if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
 
     updateLayout();
 
@@ -2441,7 +2286,7 @@ function init() {
 
   // Koordinat mouse
   map.on('mousemove', (e) => {
-    $('#coord-badge').textContent = e.latlng.lat.toFixed(5) + '°, ' + e.latlng.lng.toFixed(5) + '°';
+    $('#coord-badge').textContent = fmtCoord([e.latlng.lat, e.latlng.lng]);
   });
   map.on('mouseout', () => { $('#coord-badge').textContent = '—'; });
 
@@ -2620,10 +2465,8 @@ function init() {
   load();
   updateLayout();
 
-  // Jika preset tersimpan adalah Kop Akademik, aktifkan lembarnya.
-  if (isFormalTpl(layout.tpl)) {
-    applyTemplate(layout.tpl);
-  }
+  // Lembar kop selalu dipasang: itu satu-satunya layout aplikasi ini.
+  applyTemplate(layout.tpl);
 
   // Titik awal riwayat: keadaan dokumen setelah data lama dimuat.
   try {

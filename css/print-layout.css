@@ -2,21 +2,26 @@
    Delinaisi Maker — print-layout.css
    SATU-SATUNYA sumber aturan cetak untuk seluruh preset.
 
-   Prinsip: cetak TIDAK boleh mengubah tata letak. Yang disesuaikan
-   hanya satuan ukuran (mm/persen halaman) dan warna latar. Grid,
-   proporsi kolom, dan urutan elemen tetap identik dengan di layar.
+   Prinsip: cetak TIDAK mengubah tata letak sama sekali.
 
-   Catatan riwayat: dulu ada tiga @media print yang bertabrakan
-   (style.css, print-layout.css, formal-sheet.css) dengan nilai
-   #map-wrap yang saling berlawanan (position static/relative,
-   height 100vh/188mm). Selain itu 100vh mengacu ke viewport LAYAR,
-   sehingga lembar melebar keluar halaman saat dicetak. Semua aturan
-   cetak kini dipusatkan di sini.
+   Kenapa dulu hasil cetak "hancur": peta Leaflet menyimpan posisi
+   ubin di inline style (translate3d) yang dihitung dari ukuran
+   wadahnya DI LAYAR. Aturan cetak yang mengubah lebar kolom
+   (grid-template-columns 1fr 300px -> 1fr min(300px, 27%)),
+   tinggi (185mm/100vh), atau padding membuat ukuran #map berubah.
+   Leaflet tidak menghitung ulang, jadi ubin lama jatuh di posisi
+   yang salah dan label/graticule tidak nyambung lagi.
+
+   Solusinya: saat cetak, lembar dibekukan pada ukuran layarnya
+   (variabel --print-* diisi js/print-layout.js tepat sebelum dialog
+   cetak), lalu seluruh lembar diperkecil dengan transform: scale()
+   agar pas di area cetak. Transform tidak memicu reflow, jadi
+   ukuran #map tetap sama persis seperti di layar.
    ============================================================ */
 
 @media print {
-  /* Margin halaman: 10mm memberi ruang aman untuk printer rumahan. */
-  @page { margin: 10mm; }
+  /* Lembar kop berbentuk lanskap -> kertas lanskap. */
+  @page { size: A4 landscape; margin: 10mm; }
 
   html, body {
     height: auto;
@@ -37,51 +42,57 @@
   #help-overlay,
   #toast,
   .leaflet-control-zoom,
+  .leaflet-control-scale,
   .leaflet-control-attribution {
     display: none !important;
   }
 
-  #app { display: block; height: auto; }
-
-  /* Area peta mengisi tinggi area cetak (bukan tinggi layar). */
-  #map-wrap {
-    position: relative;
-    width: 100%;
-    height: 185mm;
-    padding: 0;
-    background: #fff;
+  /* Panggung: kotak seukuran lembar SETELAH diperkecil. overflow
+     disembunyikan agar skala tidak memicu halaman tambahan. */
+  #app {
     display: block;
-    /* Hilangkan overflow layar supaya lembar tidak ter-scroll/terpotong. */
-    overflow: visible;
+    width: var(--print-stage-w, 100%);
+    height: var(--print-stage-h, auto);
+    margin: 0 auto;
+    overflow: hidden;
   }
 
-  /* Preset formal: lembar mengikuti tinggi area cetak yang sama. */
-  #map-wrap.tpl-formal { height: 185mm; }
+  /* Lembar dibekukan pada ukuran layar, lalu diperkecil. Nilai
+     cadangan (fallback) dipakai bila variabel belum sempat diisi —
+     tetap tanpa mengubah ukuran wadah peta bila mungkin. */
+  #map-wrap {
+    position: relative;
+    display: block;
+    width: var(--print-sheet-w, 100%);
+    height: var(--print-sheet-h, 185mm);
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    background: #fff;
+    transform: scale(var(--print-scale, 1));
+    transform-origin: top left;
+  }
+
+  /* Proporsi kolom, tinggi, dan urutan blok TIDAK boleh diubah di sini:
+     itulah yang dulu membuat peta patah. Yang menyesuaikan hanyalah
+     skala keseluruhan lewat transform di atas. */
+  #map-wrap.tpl-formal { background: #fff; }
   #map-wrap.tpl-formal .formal-sheet { height: 100%; }
-  /* Panel tidak boleh punya scroll sendiri saat cetak: isinya harus utuh. */
   #map-wrap.tpl-formal .fl-panel { overflow: visible; }
 
   #map { position: absolute; inset: 0; }
   .leaflet-container { background: #fff; }
 
-  /* Grafik & warna harus ikut tercetak */
-  #map-legend,
-  #map-credit,
-  #map-north,
-  #map-title,
+  /* Grafik & warna harus ikut tercetak (browser mematikan latar grafis) */
   .fl-legend-swatch,
   .fl-kop-logo,
   .fl-scalebar-svg rect,
-  .fl-inset-box {
+  .fl-inset-box,
+  .fl-map-credit,
+  .dm-feature-label {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-
-  /* Preset overlay: posisi tetap seperti di layar, hanya ukuran font
-     yang disesuaikan agar terbaca di kertas. */
-  #map-title { max-width: calc(100% - 40px); font-size: 16px; }
-  #map-legend { top: 60px; right: 14px; }
-  #map-credit { bottom: 14px; right: 14px; }
 
   /* Cegah blok terpotong di tengah halaman */
   .fl-block, .formal-sheet { break-inside: avoid; }

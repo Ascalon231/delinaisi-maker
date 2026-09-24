@@ -18,10 +18,7 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   **skala** (kiri-bawah), dan **kotak kredit** (kanan-bawah) berisi nama pembuat,
   tanggal, **sumber data** (menyesuaikan peta dasar), dan **sistem koordinat**.
   Semuanya ikut saat ekspor PNG / cetak PDF.
-- **5 template layout** gaya QGIS/ArcGIS tinggal pilih:
-  **Klasik** (elemen menyebar), **Rapat Kanan** (semua di sisi kanan),
-  **Judul Bawah** (gaya akademik modern), **Bersih** (hanya inti), dan
-  **Kop Akademik** (lembar formal 2 kolom untuk laporan/studio).
+- **Layout Kop Akademik** — lembar formal 2 kolom siap laporan
 - **Preset "Kop Akademik" (formal)** — tata letak kop peta kartografi standar:
   - Peta (±75%) berbingkai di kiri, panel informasi (±25%) di kanan
   - **Graticule** lintang/bujur otomatis dengan label **DMS** (mis. `107°15'0"E`)
@@ -102,7 +99,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (72 test)
+# Jalankan test (79 test)
 npm test
 ```
 

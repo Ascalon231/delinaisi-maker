@@ -16,7 +16,14 @@ test.beforeEach(async ({ page }) => {
 // dengan memanggil completeShape() langsung (paling andal di headless browser).
 async function drawPolygon(page, points) {
   const map = page.locator('#map');
-  for (const [x, y] of points) {
+  // Koordinat masukan dianggap pecahan (0..1) dari ukuran peta, lalu
+  // dikonversi ke piksel. Cara ini tahan terhadap perubahan tata letak:
+  // peta kini hanya selebar kolom kiri lembar Kop Akademik, bukan
+  // seluruh lebar #map-wrap.
+  const box = await map.boundingBox();
+  for (const [fx, fy] of points) {
+    const x = Math.round(box.width * fx);
+    const y = Math.round(box.height * fy);
     await map.click({ position: { x, y } });
     await page.waitForTimeout(130);
   }
@@ -54,7 +61,7 @@ test('gambar poligon → hitung luas → modal atribut muncul', async ({ page })
   await expect(page.locator('.tool[data-tool="Polygon"]')).toHaveClass(/active/);
 
   // gambar segitiga di tengah peta
-  await drawPolygon(page, [[500, 200], [800, 200], [650, 450]]);
+  await drawPolygon(page, [[0.30, 0.26], [0.70, 0.26], [0.50, 0.58]]);
 
   // modal harus muncul dengan hasil ukur
   await expect(page.locator('#modal-overlay')).not.toHaveClass(/hidden/);
@@ -68,7 +75,7 @@ test('simpan atribut & muncul di daftar fitur', async ({ page }) => {
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
 
   await page.locator('.tool[data-tool="Polygon"]').click();
-  await drawPolygon(page, [[400, 250], [750, 250], [575, 480]]);
+  await drawPolygon(page, [[0.25, 0.33], [0.75, 0.33], [0.50, 0.62]]);
 
   await page.locator('#attr-name').fill('Batas Kelurahan Contoh');
   await page.locator('#attr-category').selectOption('batas_admin');
@@ -87,7 +94,7 @@ test('tersimpan ke localStorage & termuat ulang', async ({ page }) => {
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
 
   await page.locator('.tool[data-tool="Polygon"]').click();
-  await drawPolygon(page, [[400, 250], [750, 250], [575, 480]]);
+  await drawPolygon(page, [[0.25, 0.33], [0.75, 0.33], [0.50, 0.62]]);
   await page.locator('#attr-name').fill('Wilayah Uji');
   await page.locator('#attr-save').click();
   await page.waitForTimeout(400);
@@ -178,7 +185,7 @@ test('ekspor GeoJSON mengunduh file yang valid', async ({ page }) => {
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
 
   await page.locator('.tool[data-tool="Polygon"]').click();
-  await drawPolygon(page, [[400, 250], [750, 250], [575, 480]]);
+  await drawPolygon(page, [[0.25, 0.33], [0.75, 0.33], [0.50, 0.62]]);
   await page.locator('#attr-name').fill('Ekspor Uji');
   await page.locator('#attr-save').click();
   await page.waitForTimeout(300);
@@ -227,47 +234,48 @@ test('ganti peta dasar aktif tanpa error', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('layout peta: judul, legenda, utara & kredit tampil di atas peta', async ({ page }) => {
+test('layout: judul, legenda & sumber data tampil di lembar Kop Akademik', async ({ page }) => {
   await page.goto(APP);
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
 
-  // Judul muncul saat diisi
+  // Judul peta muncul di panel lembar
   await page.locator('#layout-title').fill('Peta Delinasi Kampus');
-  await page.locator('#layout-author').fill('Budi, Mahasiswa Geografi');
-  await page.waitForTimeout(200);
-  await expect(page.locator('#map-title')).toBeVisible();
-  await expect(page.locator('#map-title')).toHaveText('Peta Delinasi Kampus');
-  await expect(page.locator('#map-credit')).toContainText('Budi, Mahasiswa Geografi');
-  await expect(page.locator('#map-north')).toBeVisible();
+  await page.locator('#layout-author').fill('Sari Puspita');
+  await page.waitForTimeout(700);
+  await expect(page.locator('#fl-title')).toHaveText('Peta Delinasi Kampus');
 
-  // Buat satu fitur → legenda menampilkan kategori tsb
+  // Buat satu fitur -> legenda lembar menampilkan kategori tsb
   await page.locator('.tool[data-tool="Marker"]').click();
   await page.locator('#map').click({ position: { x: 600, y: 300 } });
   await page.waitForTimeout(400);
+  await page.locator('#attr-name').fill('Titik Pantau');
   await page.locator('#attr-save').click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(900);
 
-  await expect(page.locator('#map-legend')).toBeVisible();
-  await expect(page.locator('.legend-item')).toHaveCount(1);
+  await expect(page.locator('#fl-legend .fl-legend-item')).toHaveCount(1);
+  await expect(page.locator('#fl-legend .fl-legend-label')).toHaveText('Lainnya');
 
-  // Toggle legenda → sembunyi
-  await page.locator('#layout-show-legend').uncheck();
-  await page.waitForTimeout(200);
-  await expect(page.locator('#map-legend')).toHaveClass(/hidden/);
+  // Sumber data dari isian pengguna tampil di blok sumber data
+  await page.locator('#kop-sourceData').fill('Dinas PUPR Kab. Bogor');
+  await page.waitForTimeout(700);
+  await expect(page.locator('#fl-source')).toHaveText('Dinas PUPR Kab. Bogor');
 });
 
-test('layout peta: pengaturan tersimpan & dipulihkan', async ({ page }) => {
+test('layout: pengaturan tersimpan & dipulihkan', async ({ page }) => {
   await page.goto(APP);
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
 
   await page.locator('#layout-title').fill('Peta Tersimpan');
-  await page.locator('#layout-show-north').uncheck();
-  await page.waitForTimeout(200);
+  await page.locator('#kop-programStudy').fill('Perencanaan Wilayah dan Kota');
+  await page.waitForTimeout(700);
 
   const stored = await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1'));
   const parsed = JSON.parse(stored);
   expect(parsed.layout.title).toBe('Peta Tersimpan');
-  expect(parsed.layout.showNorth).toBe(false);
+  expect(parsed.layout.kop.programStudy).toBe('Perencanaan Wilayah dan Kota');
+  expect(parsed.layout.tpl).toBe('formal');
 
   // Pulihkan dengan data tersimpan
   await page.addInitScript((data) => {
@@ -275,41 +283,29 @@ test('layout peta: pengaturan tersimpan & dipulihkan', async ({ page }) => {
   }, stored);
   await page.reload();
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
-  await page.waitForTimeout(1500);
+  await page.waitForTimeout(2000);
 
-  await expect(page.locator('#map-title')).toHaveText('Peta Tersimpan');
-  await expect(page.locator('#map-north')).toHaveClass(/hidden/);
+  await expect(page.locator('#fl-title')).toHaveText('Peta Tersimpan');
+  await expect(page.locator('#kop-programStudy')).toHaveValue('Perencanaan Wilayah dan Kota');
 });
 
-test('template layout: ganti template mengubah posisi elemen', async ({ page }) => {
+test('layout: hanya preset Kop Akademik & tersimpan sebagai tpl formal', async ({ page }) => {
   await page.goto(APP);
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
-  await page.locator('#layout-title').fill('Peta Template');
-  await page.locator('#layout-author').fill('Tester');
-  await page.waitForTimeout(200);
+  await page.waitForTimeout(1200);
 
-  // Template "Judul Bawah" → judul pindah ke bawah
-  await page.locator('[data-tpl="modal"]').click();
-  await page.waitForTimeout(250);
-  await expect(page.locator('#map-wrap')).toHaveClass(/tpl-modal/);
-  const titleBox = await page.locator('#map-title').boundingBox();
-  expect(titleBox.y).toBeGreaterThan(400);
+  // Aplikasi kini memakai satu preset: lembar Kop Akademik.
+  await expect(page.locator('#tpl-row button')).toHaveCount(1);
+  await expect(page.locator('[data-tpl="formal"]')).toHaveClass(/active/);
+  await expect(page.locator('#map-wrap')).toHaveClass(/tpl-formal/);
+  await expect(page.locator('.formal-sheet')).toHaveCount(1);
 
-  // Template "Bersih" → utara & kredit sembunyi
-  await page.locator('[data-tpl="bersih"]').click();
-  await page.waitForTimeout(250);
-  await expect(page.locator('#map-north')).toHaveClass(/hidden/);
-  await expect(page.locator('#map-credit')).toHaveClass(/hidden/);
-
-  // Kembali ke klasik → semua tampil lagi
-  await page.locator('[data-tpl="klasik"]').click();
-  await page.waitForTimeout(250);
-  await expect(page.locator('#map-north')).not.toHaveClass(/hidden/);
-
-  // Tersimpan
+  // Preset tersimpan
+  await page.locator('#layout-title').fill('Peta Kop');
+  await page.waitForTimeout(600);
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem('delinaisi-maker-v1')).layout.tpl);
-  expect(stored).toBe('klasik');
+  expect(stored).toBe('formal');
 });
 
 /* ============================================================
@@ -336,28 +332,18 @@ test('kop akademik: lembar 2 kolom tampil & preset lama tetap utuh', async ({ pa
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
-  // Aktifkan preset ke-5
-  await page.locator('[data-tpl="formal"]').click();
-  await page.waitForTimeout(1200);
-
-  // Lembar formal ada, peta utama pindah ke dalamnya
+  // Preset Kop Akademik adalah satu-satunya layout, jadi lembar langsung ada.
   await expect(page.locator('.formal-sheet')).toHaveCount(1);
   await expect(page.locator('.formal-sheet #map')).toHaveCount(1);
 
-  // Field kop muncul saat preset ini aktif
+  // Field kop selalu tampil (tidak lagi bergantung pilihan preset)
   await expect(page.locator('#kop-fields')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#tpl-row button')).toHaveCount(1);
 
   // Panel kanan berada di sebelah kanan peta (2 kolom)
   const mapBox = await page.locator('.fl-map-col').boundingBox();
   const panelBox = await page.locator('.fl-panel').boundingBox();
   expect(panelBox.x).toBeGreaterThan(mapBox.x + mapBox.width - 2);
-
-  // Balik ke preset lama -> lembar dilepas, peta kembali ke #map-wrap
-  await page.locator('[data-tpl="klasik"]').click();
-  await page.waitForTimeout(800);
-  await expect(page.locator('.formal-sheet')).toHaveCount(0);
-  await expect(page.locator('#map-wrap > #map')).toHaveCount(1);
-  await expect(page.locator('#kop-fields')).toHaveClass(/hidden/);
 });
 
 test('kop akademik: legenda otomatis dari 3 kategori + warna kustom', async ({ page }) => {
@@ -560,8 +546,8 @@ test('kop akademik: teks generik (tanpa topik hardcode) & ekspor tetap tersedia'
   const api = await page.evaluate(() => typeof PaperLayout);
   expect(api).toBe('object');
 
-  // Preset lain tidak terpengaruh: 5 tombol preset ada
-  await expect(page.locator('#tpl-row button')).toHaveCount(5);
+  // Aplikasi memakai satu preset: lembar Kop Akademik
+  await expect(page.locator('#tpl-row button')).toHaveCount(1);
 });
 
 test('kop akademik: inset punya grid koordinat & bertahan saat preset ditukar', async ({ page }) => {
@@ -584,21 +570,23 @@ test('kop akademik: inset punya grid koordinat & bertahan saat preset ditukar', 
   });
   expect(await ink()).toBeGreaterThan(0);
 
-  // Tukar preset bolak-balik: inset harus dibangun ulang, bukan hilang.
+  // Inset harus tetap hidup setelah lembar digambar ulang berkali-kali
+  // (resize + penyegaran), dan tidak boleh terduplikasi.
   for (let i = 0; i < 3; i++) {
-    await page.locator('[data-tpl="klasik"]').click();
-    await page.waitForTimeout(350);
-    await page.locator('[data-tpl="formal"]').click();
-    await page.waitForTimeout(800);
+    await page.evaluate(() => FormalSheet.refresh());
+    await page.waitForTimeout(400);
   }
+  await page.setViewportSize({ width: 1400, height: 900 });
   await page.waitForTimeout(700);
+  await page.setViewportSize({ width: 1500, height: 950 });
+  await page.waitForTimeout(900);
 
   await expect(page.locator('.formal-sheet')).toHaveCount(1);
-  // Hanya ada SATU peta utama, dan ia berada di dalam lembar formal
-  // (bukan lagi anak langsung #map-wrap).
+  // Hanya ada SATU peta utama, dan ia berada di dalam lembar formal.
   await expect(page.locator('#map')).toHaveCount(1);
   await expect(page.locator('.formal-sheet #map')).toHaveCount(1);
   await expect(page.locator('#map-wrap > #map')).toHaveCount(0);
+  // Inset tidak boleh terduplikasi
   await expect(page.locator('#fl-inset-map.leaflet-container')).toHaveCount(1);
   expect(await ink()).toBeGreaterThan(0);
 });
@@ -883,17 +871,17 @@ test('peta dasar: "Sumber data" ikut berubah sesuai pilihan', async ({ page }) =
   await page.waitForTimeout(1200);
 
   // Atribusi harus mencerminkan penyedia yang aktif, bukan nilai basi.
-  await page.locator('[data-basemap="terrain"]').click();
-  await page.waitForTimeout(600);
-  await expect(page.locator('#map-credit-source')).toContainText('Esri');
+  // Kotak kredit lama tidak ada lagi di lembar Kop Akademik, jadi nilai
+  // diperiksa lewat basemapAttribution() yang dipakai ekspor.
+  const atribusi = async (id) => {
+    await page.locator(`[data-basemap="${id}"]`).click();
+    await page.waitForTimeout(600);
+    return page.evaluate(() => basemapAttribution(currentBasemap));
+  };
 
-  await page.locator('[data-basemap="topo"]').click();
-  await page.waitForTimeout(600);
-  await expect(page.locator('#map-credit-source')).toContainText('OpenTopoMap');
-
-  await page.locator('[data-basemap="streets"]').click();
-  await page.waitForTimeout(600);
-  await expect(page.locator('#map-credit-source')).toContainText('OpenStreetMap');
+  expect(await atribusi('terrain')).toContain('Esri');
+  expect(await atribusi('topo')).toContain('OpenTopoMap');
+  expect(await atribusi('streets')).toContain('OpenStreetMap');
 
   // Ikut tersimpan & terbawa ke ekspor GeoJSON
   const meta = await page.evaluate(() => {
@@ -2078,15 +2066,18 @@ test('CSV: tabel atribut untuk lampiran laporan', async ({ page }) => {
 
   const lines = isi.replace(/^\uFEFF/, '').split(/\r?\n/);
   expect(lines.length).toBe(3);                       // header + 2 fitur
-  expect(lines[0].split(';')).toHaveLength(12);       // 12 kolom
+  expect(lines[0].split(';')).toHaveLength(13);       // termasuk kolom Arah
 
   // Escaping benar: kutip digandakan, sel berisi ';' dibungkus kutip
   expect(isi).toContain('"Sawah ""Irigasi"""');
   expect(isi).toContain('"Luas sawah; produktif"');
 
-  // Desimal memakai koma (gaya Indonesia) & ada kolom koordinat
+  // Desimal memakai koma (gaya Indonesia) & ada kolom koordinat.
+  // Lintang/bujur berupa nilai absolut dengan kolom Arah terpisah, supaya
+  // tetap bisa dihitung & diurutkan sebagai angka di Excel.
   expect(lines[1]).toMatch(/\d+,\d+/);
-  expect(lines[1]).toContain('-6,920000');
+  expect(lines[1]).toContain('6,920000');
+  expect(lines[1]).toMatch(/LS\/BT$/);
 });
 
 /* ============================================================
@@ -2516,4 +2507,228 @@ test('skeleton: hormati prefers-reduced-motion', async ({ page }) => {
     path.join(__dirname, '..', 'css', 'style.css'), 'utf-8');
   // Animasi gelombang dimatikan bagi pengguna yang memintanya
   expect(css).toMatch(/prefers-reduced-motion[\s\S]{0,220}\.sk-blok\s*\{\s*animation:\s*none/);
+});
+
+/* ============================================================
+   Bahasa Indonesia & ketahanan pemuatan
+   ============================================================ */
+
+test('bahasa: tidak ada istilah Inggris yang tampil ke pengguna', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Buat fitur & aktifkan lembar formal supaya seluruh panel terisi
+  await page.evaluate(() => {
+    const poly = L.polygon([[-6.9147,107.6098],[-6.91,107.62],[-6.93,107.62],[-6.93,107.60]]);
+    addFeature({ id: ++idSeq, layer: poly, type: 'Polygon', name: 'Kawasan A',
+                 category: 'batas_admin', desc: '', measure: null }, false);
+    const pt = L.marker([3.5952, 98.6722]);
+    addFeature({ id: ++idSeq, layer: pt, type: 'Marker', name: 'Titik Utara',
+                 category: 'lainnya', desc: '', measure: null }, false);
+  });
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+
+  // Istilah Inggris yang dulu muncul: satuan skala, tombol, header CSV
+  const teksLayar = await page.evaluate(() => document.body.innerText);
+  ['Kilometers', 'Meters', 'Scale', 'Legend', 'Layer', 'Save', 'Reset',
+   'Latitude', 'Longitude', 'Delete', 'Cancel', 'Search'].forEach(kata => {
+    expect(teksLayar).not.toMatch(new RegExp('\\b' + kata + '\\b'));
+  });
+
+  // Satuan skala batang memakai istilah Indonesia
+  const satuan = await page.locator('#fl-scalebar text').allTextContents();
+  expect(satuan.join(' ')).toMatch(/Kilometer|Meter/);
+  expect(satuan.join(' ')).not.toMatch(/Kilometers|Meters/);
+
+  // Tombol alat memakai istilah Indonesia
+  await expect(page.locator('#tool-edit')).toContainText('Ubah Bentuk');
+  await expect(page.locator('#btn-cat-reset')).toHaveText('Kembalikan');
+});
+
+test('bahasa: koordinat memakai koma desimal & arah mata angin', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  const r = await page.evaluate(() => ({
+    indonesia: fmtCoord([-6.9147, 107.6098]),
+    utara: fmtCoord([3.5952, 98.6722]),
+    barat: fmtCoord([-0.5, -90.2]),
+    tidakValid: fmtCoord([NaN, 1])
+  }));
+
+  // Koma sebagai pemisah desimal, bukan titik
+  expect(r.indonesia).toContain(',');
+  expect(r.indonesia).not.toMatch(/\d\.\d/);
+  // Arah mata angin Indonesia
+  expect(r.indonesia).toBe('6,91470\u00B0 LS, 107,60980\u00B0 BT');
+  expect(r.utara).toContain('LU');
+  expect(r.barat).toContain('BB');
+  // Nilai tidak valid tidak menghasilkan "NaN"
+  expect(r.tidakValid).toBe('\u2014');
+});
+
+test('bahasa: CSV memakai header Indonesia + kolom arah', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.evaluate(() => {
+    const pt = L.marker([3.5952, 98.6722]);
+    addFeature({ id: ++idSeq, layer: pt, type: 'Marker', name: 'Titik Utara',
+                 category: 'lainnya', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(900);
+
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30000 }),
+    page.locator('#btn-export-csv').click()
+  ]);
+  const isi = await require('fs').promises.readFile(await download.path(), 'utf-8');
+  const baris = isi.replace(/^\uFEFF/, '').split(/\r?\n/);
+
+  expect(baris[0]).toContain('Lintang');
+  expect(baris[0]).toContain('Bujur');
+  expect(baris[0]).toContain('Arah');
+  expect(baris[0]).not.toMatch(/Latitude|Longitude/);
+  // Koordinat tetap ANGKA (tanpa akhiran arah) supaya bisa dihitung di Excel
+  expect(baris[1]).toMatch(/;3,595200;98,672200;LU\/BT$/);
+});
+
+test('ketahanan: pemuatan awal tidak menghasilkan error apa pun', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => {
+    // Abaikan kegagalan jaringan ubin (lingkungan uji bisa offline)
+    if (m.type() === 'error' && /Failed to fetch|net::|ERR_|tile/i.test(m.text())) return;
+    if (m.type() === 'error') errors.push(m.text());
+  });
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  // Tambah fitur & ganti basemap: dua jalur yang dulu memanggil
+  // updateLayout() saat elemen layout belum ada.
+  await seedThreeCategories(page);
+  await page.waitForTimeout(800);
+  await page.locator('[data-basemap="satellite"]').click();
+  await page.waitForTimeout(800);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+
+  expect(errors).toEqual([]);
+});
+
+/* ============================================================
+   Skala & arah utara tidak boleh melewati batas
+   ============================================================ */
+
+test('skala: batang tidak pernah melewati batas panel di semua zoom', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Semua zoom diuji: sebelumnya skala melebar sampai 473px di panel 300px
+  // (melewati batas 184px) pada zoom 5.
+  for (const z of [18, 16, 14, 12, 10, 8, 5, 3]) {
+    const r = await page.evaluate((zz) => {
+      map.setZoom(zz);
+      FormalSheet.refresh();
+      const panel = document.querySelector('.fl-panel').getBoundingClientRect();
+      const row = document.querySelector('.fl-scale-row');
+      const svg = document.querySelector('#fl-scalebar svg');
+      const kompas = document.querySelector('.fl-compass');
+      const sr = svg ? svg.getBoundingClientRect() : null;
+      return {
+        zoom: zz,
+        barKeluar: sr ? Math.round(Math.max(0, sr.right - panel.right)) : 0,
+        barKiriKeluar: sr ? Math.round(Math.max(0, panel.left - sr.left)) : 0,
+        rowOverflow: row ? Math.round(row.scrollWidth - row.clientWidth) : 0,
+        kompasKeluar: kompas ? Math.round(Math.max(0, kompas.getBoundingClientRect().right - panel.right)) : 0
+      };
+    }, z);
+    expect(r.barKeluar, 'skala keluar kanan di zoom ' + z).toBeLessThanOrEqual(0);
+    expect(r.barKiriKeluar, 'skala keluar kiri di zoom ' + z).toBeLessThanOrEqual(0);
+    expect(r.rowOverflow, 'baris skala meluber di zoom ' + z).toBeLessThanOrEqual(0);
+    expect(r.kompasKeluar, 'kompas keluar di zoom ' + z).toBeLessThanOrEqual(0);
+  }
+
+  // Angka skala tetap bulat (bukan 13/25/38/50)
+  const angka = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('#fl-scalebar text')).map(t => t.textContent));
+  expect(angka.length).toBeGreaterThanOrEqual(5);
+  angka.slice(0, -1).forEach(a => expect(Number(a)).not.toBeNaN());
+});
+
+test('skala & kompas: aman di viewport sempit dan lebar serta mode cetak', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  const periksa = () => page.evaluate(() => {
+    const panel = document.querySelector('.fl-panel').getBoundingClientRect();
+    const svg = document.querySelector('#fl-scalebar svg');
+    const kompas = document.querySelector('.fl-compass');
+    const row = document.querySelector('.fl-scale-row');
+    const sr = svg ? svg.getBoundingClientRect() : null;
+    const kr = kompas ? kompas.getBoundingClientRect() : null;
+    return {
+      barKeluar: sr ? Math.round(Math.max(0, sr.right - panel.right)) : 0,
+      kompasKeluar: kr ? Math.round(Math.max(0, kr.right - panel.right)) : 0,
+      rowOverflow: row ? Math.round(row.scrollWidth - row.clientWidth) : 0,
+      // Skala & kompas tidak boleh bertumpuk
+      tumpang: (sr && kr) ? Math.round(Math.max(0, sr.right - kr.left)) : 0,
+      barLebar: sr ? Math.round(sr.width) : 0,
+      kompasAda: !!kompas
+    };
+  });
+
+  for (const [w, h] of [[320, 700], [768, 900], [1500, 950], [2200, 1100]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(700);
+    const r = await periksa();
+    expect(r.barKeluar, 'viewport ' + w).toBeLessThanOrEqual(0);
+    expect(r.kompasKeluar, 'viewport ' + w).toBeLessThanOrEqual(0);
+    expect(r.rowOverflow, 'viewport ' + w).toBeLessThanOrEqual(0);
+    expect(r.tumpang, 'tumpang skala/kompas di ' + w).toBeLessThanOrEqual(0);
+    expect(r.barLebar).toBeGreaterThan(60);   // skala tetap terbaca
+    expect(r.kompasAda).toBe(true);
+  }
+
+  // Mode cetak A4 tegak
+  await page.setViewportSize({ width: 1500, height: 950 });
+  await page.emulateMedia({ media: 'print' });
+  await page.setViewportSize({ width: 794, height: 1123 });
+  await page.waitForTimeout(900);
+  const p = await periksa();
+  expect(p.barKeluar).toBeLessThanOrEqual(0);
+  expect(p.kompasKeluar).toBeLessThanOrEqual(0);
+  expect(p.rowOverflow).toBeLessThanOrEqual(0);
+  await page.emulateMedia({ media: 'screen' });
+});
+
+test('skala: pemilihan jarak membulat ke bawah agar tidak melebihi anggaran', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  const r = await page.evaluate(() => ({
+    f100: FormalLayout.niceDistanceFloor(100),
+    f999: FormalLayout.niceDistanceFloor(999),
+    f1000: FormalLayout.niceDistanceFloor(1000),
+    f2500: FormalLayout.niceDistanceFloor(2500),
+    f70000: FormalLayout.niceDistanceFloor(70000),
+    // Selalu <= nilai acuan
+    tidakMelebihi: [1, 37, 250, 1900, 45000, 900000]
+      .every(v => FormalLayout.niceDistanceFloor(v) <= v)
+  }));
+  expect(r.f100).toBe(100);
+  expect(r.f999).toBe(500);
+  expect(r.f1000).toBe(1000);
+  expect(r.f2500).toBe(2000);
+  expect(r.f70000).toBe(50000);
+  expect(r.tidakMelebihi).toBe(true);
 });

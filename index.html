@@ -156,7 +156,7 @@
           </button>
           <button class="tool" id="tool-edit">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 h4 L20 8 l-4 -4 L4 16 z"/><line x1="14.5" y1="7.5" x2="16.5" y2="9.5"/></svg>
-            <span>Edit</span>
+            <span>Ubah Bentuk</span>
           </button>
         </div>
         <p class="hint" id="draw-hint">Pilih salah satu alat di atas, lalu klik di peta untuk mulai menggambar. Klik dua kali (atau Enter) untuk selesaikan poligon/garis.</p>
@@ -164,7 +164,7 @@
           <span class="kbd-hint"><kbd>T</kbd> Titik</span>
           <span class="kbd-hint"><kbd>G</kbd> Garis</span>
           <span class="kbd-hint"><kbd>P</kbd> Poligon</span>
-          <span class="kbd-hint"><kbd>E</kbd> Edit</span>
+          <span class="kbd-hint"><kbd>E</kbd> Ubah bentuk</span>
           <span class="kbd-hint"><kbd>Esc</kbd> Batal</span>
           <span class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>Z</kbd> Urungkan</span>
         </div>
@@ -173,11 +173,7 @@
       <section class="card">
         <h2>3 · Layout peta <span class="pill pill-quiet">untuk laporan</span></h2>
         <div class="tpl-row" id="tpl-row">
-          <button data-tpl="klasik" class="active" title="Gaya QGIS klasik: judul tengah-atas, elemen menyebar">Klasik</button>
-          <button data-tpl="rapat" title="Semua elemen di sisi kanan (gaya ArcGIS minimal)">Rapat Kanan</button>
-          <button data-tpl="modal" title="Judul di tengah-bawah, gaya peta akademik">Judul Bawah</button>
-          <button data-tpl="bersih" title="Hanya inti: judul, legenda, skala">Bersih</button>
-          <button data-tpl="formal" title="Kop akademik: peta berbingkai + panel informasi (formal)">Kop Akademik</button>
+          <button data-tpl="formal" class="active" title="Kop akademik: peta berbingkai + panel informasi (formal)">Kop Akademik</button>
         </div>
         <label class="field field-tight">
           <span>Judul peta</span>
@@ -188,13 +184,9 @@
           <input id="layout-author" type="text" placeholder="mis. Sari Puspita, Mahasiswa PWK" maxlength="60">
         </label>
         <div class="layout-toggles">
-          <label class="toggle"><input type="checkbox" id="layout-show-legend" checked><span>Legenda</span></label>
-          <label class="toggle"><input type="checkbox" id="layout-show-north" checked><span>Arah utara</span></label>
-          <label class="toggle"><input type="checkbox" id="layout-show-scale" checked><span>Skala</span></label>
-          <label class="toggle"><input type="checkbox" id="layout-show-credit" checked><span>Kredit</span></label>
-          <label class="toggle"><input type="checkbox" id="layout-show-labels"><span>Nama fitur di peta</span></label>
+          <label class="toggle"><input type="checkbox" id="layout-show-labels" checked><span>Nama fitur di peta</span></label>
         </div>
-        <p class="hint">Gaya di atas untuk editor. Gunakan lembar cetak untuk hasil peta akademik berbingkai.</p>
+        <p class="hint">Semua teks peta diambil dari isian di bawah. Hasil akhirnya lembar siap cetak (PNG / PDF).</p>
 
         <!-- Field Kop Akademik (tampil hanya saat preset "Kop Akademik" aktif) -->
         <div id="kop-fields" class="kop-fields hidden">
@@ -325,7 +317,7 @@
       <section class="card" id="cat-color-card">
         <div class="card-head">
           <h2>Warna kategori</h2>
-          <button id="btn-cat-reset" class="btn btn-secondary btn-sm" title="Kembalikan warna bawaan">Reset</button>
+          <button id="btn-cat-reset" class="btn btn-secondary btn-sm" title="Kembalikan warna bawaan">Kembalikan</button>
         </div>
         <p class="hint">Klik kotak warna untuk ubah. Nama kategori juga bisa diganti langsung. Semua tersimpan otomatis.</p>
         <div id="cat-dupe-warn" class="cat-dupe-warn hidden"></div>
@@ -382,31 +374,10 @@
     </aside>
 
     <!-- ---------- MAP ---------- -->
-    <div id="map-wrap" class="tpl-klasik">
+    <!-- Layout peta = lembar kop akademik (satu-satunya preset). -->
+    <div id="map-wrap" class="tpl-formal">
       <div id="map"></div>
       <div id="tile-loader" class="hidden" role="status" aria-label="Memuat peta…"><div class="tile-loader-bar"></div></div>
-
-      <!-- Elemen layout peta (untuk laporan) -->
-      <div id="map-title" class="map-elem hidden"></div>
-
-      <div id="map-legend" class="map-elem hidden">
-        <div class="map-legend-head">Legenda</div>
-        <div id="map-legend-list"></div>
-      </div>
-
-      <div id="map-north" class="map-elem hidden">
-        <svg viewBox="0 0 24 40" width="22" height="38" aria-label="Utara">
-          <path d="M12 2 L20 30 L12 24 L4 30 Z" fill="#2f3b4d"/>
-          <text x="12" y="13" text-anchor="middle" font-size="9" fill="#fff" font-weight="700" font-family="sans-serif">N</text>
-        </svg>
-      </div>
-
-      <div id="map-credit" class="map-elem hidden">
-        <div id="map-credit-author"></div>
-        <div id="map-credit-date"></div>
-        <div id="map-credit-source"></div>
-        <div id="map-credit-crs">Sistem koordinat: WGS 84 (EPSG:4326)</div>
-      </div>
 
       <div id="search-box">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
@@ -454,7 +425,7 @@
         <li><b>Cari lokasi</b> lewat kotak pencarian, atau zoom &amp; geser peta ke daerahmu.</li>
         <li><b>Pilih alat gambar</b> (Titik / Garis / Poligon / Persegi / Lingkaran), lalu klik di peta. Untuk poligon &amp; garis, klik setiap titik lalu klik dua kali (atau tekan Enter) untuk selesai.</li>
         <li><b>Isi detail</b>: nama, jenis deliniasi, dan keterangan. Luas &amp; keliling dihitung otomatis.</li>
-        <li><b>Edit</b> kapan saja pakai alat Edit, atau klik kanan pada fitur. Klik fitur di panel untuk lompat ke lokasinya.</li>
+        <li><b>Ubah bentuk</b> kapan saja pakai alat Ubah Bentuk, atau klik kanan pada fitur. Klik fitur di panel untuk lompat ke lokasinya.</li>
         <li><b>Salah geser atau salah hapus?</b> Tekan <kbd>Ctrl</kbd>+<kbd>Z</kbd> untuk mengurungkan, <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> untuk mengulangi. Bisa juga lewat tombol panah di kanan atas.</li>
         <li><b>Ekspor</b> ke GeoJSON (menyimpan seluruh proyek, bisa dilanjutkan di komputer lain), <b>tabel CSV</b> untuk lampiran laporan, atau <b>PNG / PDF</b> untuk peta siap cetak. Pekerjaanmu otomatis tersimpan di browser.</li>
       </ol>

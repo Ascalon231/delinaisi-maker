@@ -32,7 +32,7 @@
   --z-map-base:    1;      /* peta & lapisan dasarnya */
   --z-graticule:   450;    /* grid koordinat di atas peta */
   --z-attribution: 500;    /* atribusi basemap */
-  --z-map-elem:    850;    /* judul/legenda/kredit di atas peta */
+  --z-map-elem:    850;    /* elemen peta di atas lapisan ubin */
   --z-map-ui:      900;    /* pencarian, badge */
   --z-backdrop:    950;    /* latar gelap drawer mobile */
   --z-drawer:      1000;   /* sidebar mobile */
@@ -332,10 +332,7 @@ svg { display: block; }
   display: flex; align-items: center; gap: 8px;
   background: #fff; border: 1px solid var(--line); border-radius: var(--r-md);
   padding: 8px 11px; box-shadow: var(--shadow-md);
-  transition: top .2s ease;
 }
-/* Saat judul peta tampil, kotak pencarian turun agar tidak bertabrakan. */
-#map-wrap.has-title #search-box { top: 56px; }
 #search-box > svg { flex: none; color: var(--ink-faint); }
 #search-input { flex: 1 1 auto; border: 0; outline: none; background: none; font-size: 13.5px; min-width: 0; }
 #search-input::placeholder { color: var(--ink-faint); }
@@ -465,91 +462,6 @@ svg { display: block; }
 
 .hidden { display: none !important; }
 
-/* ================= LAYOUT PETA (elemen di atas peta) ================= */
-.map-elem {
-  position: absolute; z-index: var(--z-map-elem); pointer-events: none;
-  user-select: none;
-}
-.map-elem.hidden { display: none !important; }
-
-#map-title {
-  top: 12px; left: 50%; transform: translateX(-50%);
-  max-width: calc(100% - 220px);
-  background: rgba(255,255,255,.93);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  padding: 7px 18px;
-  box-shadow: var(--shadow-md);
-  font-size: 14.5px; font-weight: 700; color: var(--ink);
-  text-align: center;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-#map-title:empty { display: none; }
-
-/* Standar kartografi: arah utara kanan-atas. */
-#map-north { right: 14px; top: 14px; filter: drop-shadow(0 2px 3px rgba(0,0,0,.22)); }
-
-#map-legend {
-  right: 12px; top: 62px;
-  background: rgba(255,255,255,.95);
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-md);
-  padding: 9px 12px 10px;
-  min-width: 132px; max-width: 210px;
-  font-size: 12px;
-}
-.map-legend-head {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .5px; color: var(--ink-soft);
-  padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--line);
-}
-.legend-item { display: flex; align-items: center; gap: 8px; padding: 2.5px 0; color: var(--ink); }
-.legend-swatch { width: 15px; height: 9px; border-radius: var(--r-xs); flex: none; box-shadow: 0 0 0 1px rgba(0,0,0,.12); }
-.legend-swatch.dot { width: 9px; height: 9px; border-radius: 50%; }
-.legend-swatch.line { height: 0; border-top-width: 3px; border-radius: var(--r-xs); box-shadow: none; }
-.legend-label { line-height: 1.3; word-break: break-word; }
-.legend-count { margin-left: auto; color: var(--ink-faint); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.legend-empty { color: var(--ink-faint); font-style: italic; font-size: 11.5px; }
-
-#map-credit {
-  right: 14px; bottom: 14px;
-  background: rgba(255,255,255,.93);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm); padding: 5px 10px;
-  font-size: 10px; color: var(--ink-soft); font-weight: 600;
-  box-shadow: var(--shadow-sm);
-  line-height: 1.5; text-align: right; max-width: 250px;
-}
-#map-credit div:empty { display: none; }
-#map-credit .sep { color: var(--ink-faint); margin: 0 3px; }
-
-/* ---------- Template layout (gaya QGIS/ArcGIS) ---------- */
-/* Klasik (default): judul tengah-atas, utara kanan-atas, legenda kanan, kredit kanan-bawah */
-
-/* Rapat Kanan: semua elemen di sisi kanan */
-.tpl-rapat #map-title { top: 12px; }
-.tpl-rapat #map-north { right: 14px; top: 12px; }
-.tpl-rapat #map-legend { right: 12px; top: 62px; }
-.tpl-rapat #map-credit { right: 14px; bottom: 14px; }
-.tpl-rapat .leaflet-control-scale { left: auto !important; right: 14px; bottom: 14px; }
-.tpl-rapat #coord-badge { display: none; }
-
-/* Judul Bawah: judul di tengah-bawah (gaya peta akademik/modern) */
-.tpl-modal #map-title { top: auto; bottom: 14px; }
-.tpl-modal #map-north { top: 12px; }
-.tpl-modal #map-legend { top: 62px; }
-.tpl-modal #map-credit { bottom: 14px; right: 14px; }
-.tpl-modal.has-title #map-credit { bottom: 64px; }
-.tpl-modal.has-title #coord-badge { bottom: 64px; }
-.tpl-modal.has-title .leaflet-control-scale { bottom: 64px; }
-
-/* Bersih: hanya inti (judul, legenda, skala). Sembunyikan utara & kredit */
-.tpl-bersih #map-north,
-.tpl-bersih #map-credit { display: none !important; }
-.tpl-bersih #map-legend { top: 62px; }
-.tpl-bersih.has-title #map-title { top: 12px; }
-
 .kbd-row { display: flex; flex-wrap: wrap; gap: 5px 8px; margin-top: 8px; }
 .kbd-hint {
   display: inline-flex; align-items: center; gap: 4px;
@@ -563,10 +475,13 @@ kbd {
 }
 
 /* ---------- panel layout (sidebar) ---------- */
-.tpl-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 11px; }
+/* Hanya ada satu layout (lembar kop akademik), jadi tombolnya
+   ditampilkan selebar kartu sebagai penanda layout aktif. */
+.tpl-row { display: grid; grid-template-columns: 1fr; gap: 5px; margin-bottom: 11px; }
 .tpl-row button {
   border: 1px solid var(--line); background: #f8fafc; color: var(--ink-soft);
-  border-radius: var(--r-md); padding: 7px 2px; font-size: 11.5px; font-weight: 600;
+  border-radius: var(--r-md); padding: 8px 10px; font-size: 12.5px; font-weight: 600;
+  text-align: center;
 }
 .tpl-row button:hover { background: #eef3fa; }
 .tpl-row button.active { background: #e8efff; border-color: var(--primary); color: var(--primary-d); }
@@ -611,15 +526,10 @@ kbd {
   }
   #sidebar.closed { margin-left: calc(-1 * min(320px, 88vw) - 14px); }
   .save-state span { display: none; }
+  /* Kotak pencarian turun ke bawah pada layar sempit */
   #search-box { top: auto; bottom: 12px; width: calc(100% - 24px); transform: none; left: 12px; }
   #coord-badge { display: none; }
   #measure-badge { bottom: 64px; }
-  /* Layout elemen: lebih kecil & menghindari kotak pencarian */
-  #map-title { max-width: calc(100% - 24px); top: 10px; font-size: 13px; }
-  #map-wrap.has-title #search-box { top: 52px; width: calc(100% - 24px); }
-  #map-legend { top: auto; bottom: 70px; right: 10px; min-width: 118px; max-height: 40vh; overflow-y: auto; }
-  #map-north { top: 12px; bottom: auto; right: 10px; }
-  #map-credit { bottom: 70px; right: 10px; display: none; }
 }
 
 /* ================= PRINT =================

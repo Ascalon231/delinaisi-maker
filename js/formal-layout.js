@@ -72,6 +72,19 @@ const FormalLayout = (function () {
   }
 
   // Jarak "bulat" untuk skala batang: 0,1,2,4,6,8 km dst.
+  // Jarak bulat terbesar yang TIDAK melebihi nilai acuan. Dipakai skala
+  // batang supaya lebarnya tidak pernah melampaui ruang yang tersedia.
+  function niceDistanceFloor(meters) {
+    const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500,
+      1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000,
+      1000000, 2000000, 5000000];
+    let pilih = steps[0];
+    for (let i = 0; i < steps.length; i++) {
+      if (steps[i] <= meters) pilih = steps[i]; else break;
+    }
+    return pilih;
+  }
+
   function niceDistance(meters) {
     const steps = [1, 2, 5, 10, 20, 50, 100, 200, 500,
       1000, 2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000];
@@ -197,7 +210,13 @@ const FormalLayout = (function () {
   // angka di bawah tiap segmen. Mengembalikan { el } berupa SVG.
   function buildScaleBar(map, containerWidth) {
     const svgNS = 'http://www.w3.org/2000/svg';
-    const maxPx = Math.max(90, Math.min(containerWidth - 24, 210));
+    // Lebar skala harus benar-benar muat di ruang yang tersedia.
+    // Sebelumnya niceDistance() membulatkan jarak KE ATAS, sehingga batang
+    // bisa jauh lebih lebar dari anggaran dan menembus batas panel
+    // (terukur 473px di panel 300px). Anggaran kini dipakai untuk memilih
+    // jarak bulat terbesar yang MASIH muat, bukan yang terkecil di atasnya.
+    const tersedia = Math.max(80, Math.floor(containerWidth) - 6);
+    const maxPx = Math.max(60, Math.min(tersedia, 200));
 
     const y = map.getBounds().getNorth();
     const x = map.getBounds().getWest();
@@ -210,16 +229,18 @@ const FormalLayout = (function () {
     })();
 
     const targetMeters = metersPerPx * maxPx;
-    const totalMeters = niceDistance(targetMeters);
+    // Pilih jarak bulat yang tidak melebihi anggaran piksel.
+    const totalMeters = niceDistanceFloor(targetMeters);
     const pxPerMeter = maxPx / targetMeters;
-    const barPx = totalMeters * pxPerMeter;
+    const barPx = Math.min(totalMeters * pxPerMeter, maxPx);
 
     // Segmen mengikuti gaya skala peta cetak: tiap segmen diberi angka
     // jarak kumulatif di bawahnya. Dipakai 4 segmen (5 angka: 0..total).
     const segs = 4;
     const segPx = barPx / segs;
+    // Satuan memakai istilah Indonesia yang lazim di peta cetak.
     const useKm = totalMeters >= 1000;
-    const unit = useKm ? 'Kilometers' : 'Meters';
+    const unit = useKm ? 'Kilometer' : 'Meter';
 
     const H = 7;
     const padL = 2, padR = 2, top = 14, labelH = 13, unitH = 12;
@@ -312,6 +333,7 @@ const FormalLayout = (function () {
   return {
     toDMS: toDMS,
     clampLabel: clampLabel,
+    niceDistanceFloor: niceDistanceFloor,
     intervalFor: intervalFor,
     drawGraticule: drawGraticule,
     buildScaleBar: buildScaleBar,

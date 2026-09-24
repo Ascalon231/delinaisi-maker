@@ -16,14 +16,13 @@
   padding: 10px;
 }
 
-/* Elemen overlay editor tidak dipakai di lembar formal */
-#map-wrap.tpl-formal > #map-title,
-#map-wrap.tpl-formal > #map-legend,
-#map-wrap.tpl-formal > #map-north,
-#map-wrap.tpl-formal > #map-credit,
-#map-wrap.tpl-formal > #map > .leaflet-control-scale,
-#map-wrap.tpl-formal > #map > .leaflet-control-zoom,
-#map-wrap.tpl-formal > #map > .leaflet-control-attribution {
+/* Kontrol bawaan Leaflet (zoom, atribusi, skala) adalah "chrome" editor:
+   di lembar cetak tempatnya digantikan blok skala, arah utara, dan baris
+   kredit milik lembar sendiri. Selector memakai .formal-sheet karena #map
+   kini berada DI DALAM lembar, bukan lagi anak langsung #map-wrap. */
+.formal-sheet .leaflet-control-zoom,
+.formal-sheet .leaflet-control-attribution,
+.formal-sheet .leaflet-control-scale {
   display: none !important;
 }
 
@@ -76,6 +75,23 @@
   inset: 0;
   z-index: var(--z-map-base);
 }
+
+/* Baris kredit sumber peta dasar — wajib ada untuk atribusi
+   (OpenStreetMap/CARTO/Esri) di lembar yang dicetak. */
+.fl-map-credit {
+  position: absolute;
+  left: 0; bottom: 0;
+  z-index: var(--z-graticule);
+  max-width: 100%;
+  padding: 2px 5px;
+  font-family: "Times New Roman", Georgia, serif;
+  font-size: 8.5px;
+  line-height: 1.3;
+  color: #111;
+  background: rgba(255, 255, 255, .82);
+  pointer-events: none;
+}
+.fl-map-credit:empty { display: none; }
 
 /* ---------- Kolom panel informasi ---------- */
 .fl-panel {
@@ -134,13 +150,21 @@
 .fl-title:empty { display: none; }
 
 /* Blok skala */
-.fl-scale-row { display: flex; align-items: flex-start; gap: 8px; }
-.fl-scale-left { flex: 1 1 auto; min-width: 0; }
+/* min-width:0 pada anak flex penting: tanpa itu isi yang lebar (skala
+   batang) memaksa baris melebar dan menembus batas panel. */
+.fl-scale-row {
+  display: flex; align-items: flex-start; gap: 8px;
+  min-width: 0; max-width: 100%;
+}
+.fl-scale-left { flex: 1 1 auto; min-width: 0; overflow: hidden; }
 .fl-scale-label {
   font-size: 11px; font-weight: 700; letter-spacing: .3px; margin-bottom: 3px;
 }
-.fl-scalebar { display: block; }
-.fl-compass { flex: none; margin-left: auto; }
+.fl-scalebar { display: block; max-width: 100%; overflow: hidden; }
+.fl-scalebar svg { max-width: 100%; height: auto; }
+/* Kompas tidak boleh menyusut atau terdorong keluar baris. */
+.fl-compass { flex: 0 0 auto; margin-left: auto; }
+.fl-compass svg { display: block; }
 .fl-compass svg { display: block; }
 
 /* Sistem referensi */
@@ -233,7 +257,7 @@
 .fl-sign-degree { font-weight: 400; }
 
 /* ---------- Responsif: panel turun ke bawah ---------- */
-@media (max-width: 900px) {
+@media screen and (max-width: 900px) {
   .formal-sheet {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(240px, 1fr) auto;
@@ -244,7 +268,6 @@
   .fl-inset-wrap { height: 130px; }
 }
 
-/* ---------- Cetak ---------- */
 @media print {
   /* Prinsip: JANGAN mengubah tata letak saat cetak — hanya menyesuaikan
      satuan ukuran. Grid 2 kolom, proporsi, dan urutan blok tetap sama

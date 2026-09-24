@@ -54,8 +54,12 @@ const FormalSheet = (function () {
     mapHost = el('div', 'fl-map-host');
     const grat = el('canvas', 'fl-graticule-canvas');
     grat.id = 'fl-graticule';
+    // Baris kredit sumber peta dasar (atribusi) di tepi bawah peta.
+    const credit = el('div', 'fl-map-credit');
+    credit.id = 'fl-credit';
     frame.appendChild(mapHost);
     frame.appendChild(grat);
+    frame.appendChild(credit);
     mapCol.appendChild(frame);
 
     /* ---- Kolom kanan: panel informasi ---- */
@@ -284,7 +288,18 @@ const FormalSheet = (function () {
   function refreshScaleBar() {
     const host = document.getElementById('fl-scalebar');
     if (!host) return;
-    const width = host.clientWidth || 200;
+    // Ukur ruang yang benar-benar tersedia untuk skala: lebar baris
+    // dikurangi lebar kompas dan celahnya. Memakai lebar panel saja
+    // membuat skala bisa menembus batas (terukur 473px di panel 300px).
+    const row = host.closest('.fl-scale-row');
+    const kompas = row ? row.querySelector('.fl-compass') : null;
+    let width = host.clientWidth || 0;
+    if (row && kompas) {
+      const gap = 8;
+      const tersedia = row.clientWidth - kompas.offsetWidth - gap;
+      if (tersedia > 0) width = Math.min(width || tersedia, tersedia);
+    }
+    if (!width || width < 60) width = 160;
     host.innerHTML = '';
     host.appendChild(FormalLayout.buildScaleBar(map, width));
   }
