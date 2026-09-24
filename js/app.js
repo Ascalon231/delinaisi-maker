@@ -1198,7 +1198,10 @@ function runAdminSearch() {
     .then(({ results, fromCache }) => {
       renderAdminResults(results);
       if (!results.length) {
-        adminStatus('Tidak ditemukan. Coba nama yang lebih spesifik (mis. "Kabupaten Bogor").');
+        const q = AdminBoundaries.cleanQuery(($('#admin-q').value || ''));
+        adminStatus('Tidak ditemukan untuk "' + q + '". Coba tulis nama wilayahnya saja ' +
+          '(mis. "Cibinong, Bogor" atau "Kabupaten Bogor") — kata seperti "Kecamatan" ' +
+          'biasanya tidak dipakai di data OpenStreetMap.', true);
       } else {
         adminStatus(results.length + ' batas ditemukan' +
           (fromCache ? ' (dari cache, tanpa memanggil server).' : '. Klik salah satu untuk memuat.'));

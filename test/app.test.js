@@ -1145,3 +1145,66 @@ test('batas administrasi: legenda formal tetap terisi walau belum ada fitur', as
   await expect(page.locator('#fl-legend .fl-legend-sub')).toHaveText('Batas Administrasi');
   await expect(page.locator('#fl-legend .fl-legend-label')).toHaveText('Bogor');
 });
+
+test('batas administrasi: awalan tingkat dibuang agar pencarian berhasil', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Di OSM relasi batas Indonesia bernama polos ("Cibinong"), sehingga
+  // awalan "Kecamatan"/"Kabupaten" membuat pencarian gagal. Harus dibuang.
+  const r = await page.evaluate(() => ({
+    kec: AdminBoundaries.cleanQuery('Kecamatan Cibinong'),
+    kab: AdminBoundaries.cleanQuery('Kabupaten Bogor'),
+    kel: AdminBoundaries.cleanQuery('Kelurahan Sukamaju'),
+    desa: AdminBoundaries.cleanQuery('Desa Sukamaju'),
+    prov: AdminBoundaries.cleanQuery('Provinsi Jawa Barat'),
+    kota: AdminBoundaries.cleanQuery('Kota Bandung'),
+    ganda: AdminBoundaries.cleanQuery('Kecamatan Kelurahan X'),
+    polos: AdminBoundaries.cleanQuery('Cibinong, Bogor')
+  }));
+  expect(r.kec).toBe('Cibinong');
+  expect(r.kab).toBe('Bogor');
+  expect(r.kel).toBe('Sukamaju');
+  expect(r.desa).toBe('Sukamaju');
+  expect(r.prov).toBe('Jawa Barat');
+  expect(r.kota).toBe('Bandung');
+  expect(r.ganda).toBe('X');
+  // Nama tanpa awalan dibiarkan apa adanya
+  expect(r.polos).toBe('Cibinong, Bogor');
+
+  // Kueri yang dikirim ke server sudah bersih
+  const sent = [];
+  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+    const u = decodeURIComponent(route.request().url());
+    const m = u.match(/q=([^&]*)/);
+    if (m) sent.push(m[1]);
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(NOMINATIM_FIXTURE) });
+  });
+  await page.locator('#admin-q').fill('Kecamatan Cibinong');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1500);
+  expect(sent).toEqual(['Cibinong']);
+  expect(await page.locator('.admin-item').count()).toBeGreaterThan(0);
+});
+
+test('batas administrasi: pesan bantuan muncul saat tidak ada hasil', async ({ page }) => {
+  await page.route('**/nominatim.openstreetmap.org/**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: '[]'
+  }));
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('#admin-q').fill('Kecamatan Tidak Ada');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1500);
+
+  const status = page.locator('#admin-status');
+  await expect(status).toContainText('Tidak ditemukan');
+  await expect(status).toContainText('Tidak Ada');       // kueri bersih disebut
+  await expect(status).toContainText('OpenStreetMap');   // saran penulisan
+  await expect(page.locator('.admin-empty')).toHaveCount(1);
+});

@@ -110,9 +110,26 @@ const AdminBoundaries = (function () {
     return countPoints(r.geojson) >= 20;
   }
 
+  /* -------------------- Pembersihan kueri -------------------- */
+  // Di OSM, relasi batas Indonesia diberi nama polos ("Cibinong"), bukan
+  // "Kecamatan Cibinong". Menyertakan kata tingkat justru membuat
+  // pencarian gagal / mengembalikan kantor kecamatan. Awalan ini dibuang
+  // otomatis supaya user tidak perlu tahu seluk-beluknya.
+  const LEVEL_PREFIX = /^(kecamatan|kec\.?|kelurahan|kel\.?|desa|kabupaten|kab\.?|kota|kotamadya|provinsi|propinsi|daerah istimewa|dki)\s+/i;
+
+  function cleanQuery(q) {
+    let out = String(q || '').trim().replace(/\s+/g, ' ');
+    // Buang awalan tingkat berulang (mis. "Kecamatan Kelurahan X").
+    let guard = 0;
+    while (LEVEL_PREFIX.test(out) && guard++ < 3) {
+      out = out.replace(LEVEL_PREFIX, '');
+    }
+    return out.trim() || String(q || '').trim();
+  }
+
   /* -------------------- Pencarian -------------------- */
   function search(query, level) {
-    const key = 'q:' + query.trim().toLowerCase() + '|' + (level || 'any');
+    const key = 'q:' + cleanQuery(query).toLowerCase() + '|' + (level || 'any');
     const cached = cacheGet(key);
     if (cached) {
       return Promise.resolve({ results: cached, fromCache: true });
@@ -120,7 +137,7 @@ const AdminBoundaries = (function () {
 
     const params = new URLSearchParams({
       format: 'jsonv2',
-      q: query,
+      q: cleanQuery(query),
       polygon_geojson: '1',
       limit: '8',
       addressdetails: '1',
@@ -226,6 +243,7 @@ const AdminBoundaries = (function () {
     toggle: toggle,
     hasData: hasData,
     levelOf: levelOf,
+    cleanQuery: cleanQuery,
     countPoints: countPoints,
     isRealBoundary: isRealBoundary,
     get current() { return lastResult; },
