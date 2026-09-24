@@ -438,6 +438,22 @@ const FormalSheet = (function () {
       host.appendChild(g);
     }
 
+    // Batas administrasi yang dimuat user ikut masuk legenda, karena
+    // garisnya tampil di peta dan wajib dijelaskan di lembar cetak.
+    if (typeof AdminBoundaries !== 'undefined' && AdminBoundaries.hasData()) {
+      const g = el('div', 'fl-legend-group');
+      g.appendChild(el('div', 'fl-legend-sub', 'Batas Administrasi'));
+      const row = el('div', 'fl-legend-item');
+      const sw = el('span', 'fl-legend-swatch is-line');
+      sw.style.borderTopColor = '#1f2d3d';
+      sw.style.borderTopStyle = 'dashed';
+      row.appendChild(sw);
+      const nm = AdminBoundaries.current ? AdminBoundaries.current.short : 'Batas wilayah';
+      row.appendChild(el('span', 'fl-legend-label', nm));
+      g.appendChild(row);
+      host.appendChild(g);
+    }
+
     if (polyish.length) {
       const g = el('div', 'fl-legend-group');
       g.appendChild(el('div', 'fl-legend-sub', 'Area'));

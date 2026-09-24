@@ -44,6 +44,14 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   **Kosong** (tanpa peta dasar). Sengaja tidak memakai penyedia ber-API key
   seperti Stadia/Mapbox/Thunderforest agar tidak gagal di komputer pengguna.
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
+- **Batas administrasi** sebagai lapisan terpisah (tidak bercampur dengan
+  delinasi Anda): cari provinsi / kabupaten-kota / kecamatan / kelurahan-desa,
+  lalu muat batasnya sebagai garis putus-putus di atas peta dasar. Bisa
+  disembunyikan, dihapus, dan otomatis ikut masuk legenda lembar cetak.
+  Sumber OpenStreetMap (ODbL) via Nominatim — **tanpa API key**.
+  Pencarian hanya dijalankan saat tombol ditekan (bukan saat mengetik),
+  hasilnya di-cache, dan permintaan dibatasi 1/detik sesuai
+  [kebijakan Nominatim](https://operations.osmfoundation.org/policies/nominatim/).
 - **Edit bentuk** ulang lewat alat Edit
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)
 - **Ramah pengguna & mudah diakses**:
@@ -76,7 +84,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (29 test)
+# Jalankan test (34 test)
 npm test
 ```
 
@@ -110,7 +118,7 @@ graticule/skala/kompas/inset, sinkronisasi bounding box, dan persistensi field k
 | [Turf.js](https://turfjs.org/) | Perhitungan geospasial (luas, keliling) |
 | [html2canvas](https://html2canvas.hertzen.com/) | Ekspor PNG |
 | Canvas 2D API (bawaan browser) | Graticule & label koordinat |
-| Nominatim (OpenStreetMap) | Pencarian lokasi |
+| Nominatim (OpenStreetMap) | Pencarian lokasi + batas administrasi |
 
 Tidak ada backend, tidak ada database, tidak ada pelacakan.
 
@@ -125,6 +133,7 @@ Tidak ada backend, tidak ada database, tidak ada pelacakan.
 │   └── print-layout.css    # Aturan cetak / PDF
 ├── js/
 │   ├── app.js              # Logika utama aplikasi
+│   ├── admin-boundaries.js # Batas administrasi (Nominatim, tanpa API key)
 │   ├── formal-layout.js    # Graticule, skala batang, format DMS
 │   ├── formal-sheet.js     # Lembar 2 kolom, inset, legenda otomatis
 │   └── print-layout.js     # PaperLayout: ekspor PNG & cetak

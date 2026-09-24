@@ -74,6 +74,44 @@
         </div>
       </section>
 
+      <section class="card" id="admin-card">
+        <div class="card-head">
+          <h2>Batas administrasi</h2>
+          <label class="toggle toggle-inline" title="Tampilkan/sembunyikan lapisan batas">
+            <input type="checkbox" id="admin-show"><span>Tampil</span>
+          </label>
+        </div>
+        <p class="hint hint-tight">Lapisan terpisah dari delinasi Anda. Sumber: OpenStreetMap (ODbL), tanpa API key.</p>
+
+        <label class="field field-tight">
+          <span>Nama wilayah</span>
+          <input id="admin-q" type="text" placeholder="mis. Kabupaten Bogor / Cibinong, Bogor" maxlength="80" autocomplete="off">
+        </label>
+        <label class="field field-tight">
+          <span>Tingkat</span>
+          <select id="admin-level">
+            <option value="any">Semua tingkat</option>
+            <option value="province">Provinsi</option>
+            <option value="regency">Kabupaten / Kota</option>
+            <option value="district">Kecamatan</option>
+            <option value="village">Kelurahan / Desa</option>
+          </select>
+        </label>
+        <button id="admin-search" class="btn btn-secondary admin-go">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+          Cari &amp; muat batas
+        </button>
+        <p class="hint" id="admin-status">Tekan tombol untuk mencari (bukan otomatis, agar tidak melanggar batas kuota layanan publik OSM).</p>
+        <div id="admin-results" class="admin-results"></div>
+        <div id="admin-loaded" class="admin-loaded hidden">
+          <div class="admin-loaded-head">
+            <span id="admin-loaded-name"></span>
+            <button id="admin-clear" class="btn btn-danger-ghost btn-sm">Hapus</button>
+          </div>
+          <div id="admin-loaded-meta" class="admin-loaded-meta"></div>
+        </div>
+      </section>
+
       <section class="card">
         <h2>2 · Gambar di peta</h2>
         <div class="tools" id="tools">
@@ -341,6 +379,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <script src="js/app.js"></script>
+  <script src="js/admin-boundaries.js"></script>
   <script src="js/formal-layout.js"></script>
   <script src="js/formal-sheet.js"></script>
   <script src="js/print-layout.js"></script>

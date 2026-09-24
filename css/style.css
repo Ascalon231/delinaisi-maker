@@ -775,3 +775,51 @@ button, .tool, .tpl-row button, .icon-btn, .feat-item {
 }
 .kop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
 .kop-grid .field-tight { min-width: 0; }
+
+/* ================= BATAS ADMINISTRASI ================= */
+.toggle-inline { font-size: 11.5px; padding: 0; }
+.toggle-inline span { font-size: 11.5px; font-weight: 600; }
+
+.admin-go { width: 100%; margin-top: 2px; }
+
+.admin-results { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+.admin-results:empty { margin-top: 0; }
+
+.admin-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  text-align: left; border: 1px solid var(--line); background: #fbfcfe;
+  border-radius: 9px; padding: 7px 9px; cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.admin-item:hover { background: #f2f6fd; border-color: #c6d2e4; }
+.admin-item.active { border-color: var(--primary); background: #eef4ff; box-shadow: 0 0 0 2px rgba(47,111,237,.14); }
+.admin-item-main { flex: 1 1 auto; min-width: 0; }
+.admin-item-name {
+  display: block; font-size: 12.5px; font-weight: 700; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.admin-item-sub {
+  display: block; font-size: 10.5px; color: var(--ink-faint); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.admin-item-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.admin-badge {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .3px;
+  background: #e8ecf4; color: var(--ink-soft);
+  padding: 2px 6px; border-radius: 20px; white-space: nowrap;
+}
+.admin-pts { font-size: 9.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.admin-empty { font-size: 11.5px; color: var(--ink-faint); font-style: italic; line-height: 1.5; }
+
+.admin-loaded {
+  margin-top: 9px; padding: 8px 10px;
+  background: #eef7f1; border: 1px solid #cfe8da; border-radius: 9px;
+}
+.admin-loaded.hidden { display: none; }
+.admin-loaded-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  font-size: 12.5px; font-weight: 700; color: #1d6b45;
+}
+.admin-loaded-meta { font-size: 10.5px; color: #3f7a5c; margin-top: 2px; }
+
+#admin-status.is-error { color: var(--danger); }

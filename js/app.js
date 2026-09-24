@@ -1122,6 +1122,121 @@ function resetCategoryColors() {
   toast('Warna bawaan dipulihkan');
 }
 
+/* -------------------- Batas administrasi (lapisan terpisah) -------------------- */
+// Lapisan ini sengaja TIDAK ikut menjadi fitur delinasi: ia hanya latar
+// acuan. User tetap bisa menggambar di atasnya.
+function adminStatus(msg, isError) {
+  const el = $('#admin-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.toggle('is-error', !!isError);
+}
+
+function renderAdminResults(list) {
+  const box = $('#admin-results');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<div class="admin-empty">Tidak ada batas administratif yang cocok. Coba nama lain, atau pilih tingkat "Semua tingkat".</div>';
+    return;
+  }
+  list.forEach(r => {
+    const lv = AdminBoundaries.levelOf(r.rank);
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'admin-item';
+    row.innerHTML =
+      '<span class="admin-item-main">' +
+        '<span class="admin-item-name">' + esc(r.short) + '</span>' +
+        '<span class="admin-item-sub">' + esc(r.name) + '</span>' +
+      '</span>' +
+      '<span class="admin-item-meta">' +
+        '<span class="admin-badge">' + esc(lv.label) + '</span>' +
+        '<span class="admin-pts">' + AdminBoundaries.countPoints(r.geom).toLocaleString('id-ID') + ' titik</span>' +
+      '</span>';
+    row.addEventListener('click', () => {
+      AdminBoundaries.draw(r);
+      showAdminLoaded(r);
+      renderAdminResults(list);
+      // Zoom ke batas yang baru dimuat.
+      try {
+        const b = AdminBoundaries.current;
+        const gj = L.geoJSON(null);
+        gj.addData({ type: 'Feature', properties: {}, geometry: r.geom });
+        map.flyToBounds(gj.getBounds(), { duration: .7, padding: [30, 30] });
+      } catch (e) { /* diabaikan */ }
+    });
+    if (AdminBoundaries.current && AdminBoundaries.current.osm === r.osm) {
+      row.classList.add('active');
+    }
+    box.appendChild(row);
+  });
+}
+
+function showAdminLoaded(r) {
+  const box = $('#admin-loaded');
+  if (!box) return;
+  box.classList.remove('hidden');
+  $('#admin-loaded-name').textContent = r.short;
+  const lv = AdminBoundaries.levelOf(r.rank);
+  $('#admin-loaded-meta').textContent =
+    lv.label + ' · ' + AdminBoundaries.countPoints(r.geom).toLocaleString('id-ID') + ' titik · OSM ' + r.osm;
+  const show = $('#admin-show');
+  if (show) show.checked = true;
+}
+
+function runAdminSearch() {
+  const q = ($('#admin-q').value || '').trim();
+  if (q.length < 3) { adminStatus('Tulis minimal 3 huruf nama wilayah.', true); return; }
+
+  const btn = $('#admin-search');
+  const level = $('#admin-level').value;
+  btn.disabled = true;
+  adminStatus('Mencari batas…');
+
+  AdminBoundaries.search(q, level)
+    .then(({ results, fromCache }) => {
+      renderAdminResults(results);
+      if (!results.length) {
+        adminStatus('Tidak ditemukan. Coba nama yang lebih spesifik (mis. "Kabupaten Bogor").');
+      } else {
+        adminStatus(results.length + ' batas ditemukan' +
+          (fromCache ? ' (dari cache, tanpa memanggil server).' : '. Klik salah satu untuk memuat.'));
+      }
+    })
+    .catch(err => {
+      adminStatus('Gagal mencari: ' + (err && err.message ? err.message : err) + '. Cek koneksi internet.', true);
+    })
+    .then(() => { btn.disabled = false; });
+}
+
+function bindAdminBoundaries() {
+  const btn = $('#admin-search');
+  if (!btn) return;
+
+  btn.addEventListener('click', runAdminSearch);
+  // Enter di kolom nama = cari (tetap atas permintaan user, bukan saat mengetik).
+  $('#admin-q').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); runAdminSearch(); }
+  });
+  $('#admin-level').addEventListener('change', () => {
+    if (($('#admin-q').value || '').trim().length >= 3) runAdminSearch();
+  });
+
+  $('#admin-show').addEventListener('change', (e) => {
+    AdminBoundaries.setVisible(e.target.checked);
+  });
+
+  $('#admin-clear').addEventListener('click', () => {
+    AdminBoundaries.clear();
+    $('#admin-loaded').classList.add('hidden');
+    $('#admin-results').innerHTML = '';
+    const show = $('#admin-show');
+    if (show) show.checked = false;
+    adminStatus('Batas dihapus. Tekan tombol untuk mencari lagi.');
+  });
+}
+
 /* -------------------- Pencarian lokasi (Nominatim) -------------------- */
 let searchTimer;
 function doSearch(q) {
@@ -1687,6 +1802,9 @@ function init() {
       toggleEdit();
     }
   });
+
+  // ---- Batas administrasi ----
+  bindAdminBoundaries();
 
   // ---- Layout peta ----
   bindLayout();

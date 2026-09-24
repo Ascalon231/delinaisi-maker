@@ -919,3 +919,205 @@ test('peta dasar: mode "Kosong" tetap bisa menggambar & inset tetap hidup', asyn
   await page.waitForTimeout(1600);
   expect(await page.locator('#fl-inset-map .leaflet-tile').count()).toBeGreaterThan(0);
 });
+
+/* ============================================================
+   Batas administrasi (lapisan terpisah, Nominatim tanpa API key)
+   ============================================================ */
+
+// Data tiruan: meniru bentuk respons Nominatim, termasuk jebakan
+// "Kantor Kecamatan" (bangunan) yang harus ditolak filter.
+const NOMINATIM_FIXTURE = [
+  {
+    display_name: 'Kantor Kecamatan Cibinong, Jalan HR Lukman, Indonesia',
+    name: 'Kantor Kecamatan Cibinong',
+    category: 'government', type: 'government', place_rank: 30,
+    osm_type: 'way', osm_id: 111,
+    geojson: { type: 'Polygon', coordinates: [[[106.8,-6.4],[106.81,-6.4],[106.81,-6.41],[106.8,-6.41],[106.8,-6.4]]] }
+  },
+  {
+    display_name: 'Bogor, Jawa Barat, Indonesia',
+    name: 'Bogor',
+    category: 'boundary', type: 'administrative', place_rank: 12,
+    osm_type: 'relation', osm_id: 14762112,
+    geojson: {
+      type: 'Polygon',
+      coordinates: [Array.from({ length: 60 }, (_, i) => [106.7 + i * 0.001, -6.5])]
+    }
+  },
+  {
+    display_name: 'Cibinong, Bogor, Jawa Barat, Indonesia',
+    name: 'Cibinong',
+    category: 'boundary', type: 'administrative', place_rank: 14,
+    osm_type: 'relation', osm_id: 19957699,
+    geojson: {
+      type: 'MultiPolygon',
+      coordinates: [[Array.from({ length: 40 }, (_, i) => [106.8 + i * 0.001, -6.48])]]
+    }
+  }
+];
+
+async function mockNominatim(page) {
+  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(NOMINATIM_FIXTURE)
+    });
+  });
+}
+
+test('batas administrasi: filter menolak bangunan, hanya terima batas asli', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  const r = await page.evaluate(() => {
+    const kantor = { category: 'government', type: 'government',
+      geojson: { type: 'Polygon', coordinates: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] } };
+    const tanpaGeom = { category: 'boundary', type: 'administrative', geojson: null };
+    const garis = { category: 'boundary', type: 'administrative',
+      geojson: { type: 'LineString', coordinates: [[0,0],[1,1]] } };
+    const asli = { category: 'boundary', type: 'administrative',
+      geojson: { type: 'Polygon', coordinates: [Array.from({length:50},(_,i)=>[106+i*0.001,-6.5])] } };
+    const terlaluKecil = { category: 'boundary', type: 'administrative',
+      geojson: { type: 'Polygon', coordinates: [[[0,0],[1,0],[1,1],[0,1],[0,0]]] } };
+    return {
+      kantor: AdminBoundaries.isRealBoundary(kantor),
+      tanpaGeom: AdminBoundaries.isRealBoundary(tanpaGeom),
+      garis: AdminBoundaries.isRealBoundary(garis),
+      asli: AdminBoundaries.isRealBoundary(asli),
+      terlaluKecil: AdminBoundaries.isRealBoundary(terlaluKecil)
+    };
+  });
+  expect(r.kantor).toBe(false);
+  expect(r.tanpaGeom).toBe(false);
+  expect(r.garis).toBe(false);
+  expect(r.asli).toBe(true);
+  expect(r.terlaluKecil).toBe(false);
+});
+
+test('batas administrasi: cari, muat, toggle, dan hapus', async ({ page }) => {
+  await mockNominatim(page);
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('#admin-q').fill('Bogor');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1500);
+
+  // Hanya 2 batas asli yang lolos (bangunan kantor ditolak)
+  await expect(page.locator('.admin-item')).toHaveCount(2);
+  await expect(page.locator('#admin-status')).toContainText('2 batas ditemukan');
+
+  // Muat batas pertama
+  await page.locator('.admin-item').first().click();
+  await page.waitForTimeout(1200);
+
+  await expect(page.locator('#admin-loaded')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#admin-loaded-meta')).toContainText('Kabupaten/Kota');
+  expect(await page.evaluate(() => AdminBoundaries.hasData())).toBe(true);
+  await expect(page.locator('#admin-show')).toBeChecked();
+
+  // Toggle sembunyikan / tampilkan
+  await page.locator('#admin-show').uncheck();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => {
+    let visible = false;
+    map.eachLayer(l => { if (l.options && l.options.dashArray === '6 4' && map.hasLayer(l)) visible = true; });
+    return visible;
+  })).toBe(false);
+
+  await page.locator('#admin-show').check();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => {
+    let visible = false;
+    map.eachLayer(l => { if (l.options && l.options.dashArray === '6 4' && map.hasLayer(l)) visible = true; });
+    return visible;
+  })).toBe(true);
+
+  // Hapus
+  await page.locator('#admin-clear').click();
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => AdminBoundaries.hasData())).toBe(false);
+  await expect(page.locator('#admin-loaded')).toHaveClass(/hidden/);
+});
+
+test('batas administrasi: tidak autocomplete & kueri ulang pakai cache', async ({ page }) => {
+  let calls = 0;
+  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+    calls++;
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify(NOMINATIM_FIXTURE) });
+  });
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Mengetik TIDAK boleh memicu permintaan (Nominatim melarang autocomplete)
+  await page.locator('#admin-q').pressSequentially('Bogor', { delay: 120 });
+  await page.waitForTimeout(1800);
+  expect(calls).toBe(0);
+
+  // Tombol memicu satu permintaan
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1500);
+  expect(calls).toBe(1);
+
+  // Kueri sama lagi -> dari cache, tidak ada permintaan baru
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1200);
+  expect(calls).toBe(1);
+  await expect(page.locator('#admin-status')).toContainText('cache');
+});
+
+test('batas administrasi: terpisah dari delinasi & masuk legenda formal', async ({ page }) => {
+  await mockNominatim(page);
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('#admin-q').fill('Bogor');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1200);
+  await page.locator('.admin-item').first().click();
+  await page.waitForTimeout(1200);
+
+  // Batas administrasi BUKAN fitur delinasi user
+  await expect(page.locator('#feat-count')).toHaveText('0');
+
+  // User tetap bisa menggambar di atasnya
+  await seedThreeCategories(page);
+  await expect(page.locator('#feat-count')).toHaveText('3');
+
+  // Legenda lembar formal memuat keduanya
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+  const groups = await page.locator('#fl-legend .fl-legend-sub').allTextContents();
+  expect(groups).toContain('Batas Administrasi');
+  const labels = await page.locator('#fl-legend .fl-legend-label').allTextContents();
+  expect(labels).toContain('Bogor');
+  expect(labels).toContain('Batas Administrasi'); // kategori delinasi user
+});
+
+test('batas administrasi: status jelas saat gagal & saat kueri terlalu pendek', async ({ page }) => {
+  await page.route('**/nominatim.openstreetmap.org/**', route => route.abort());
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Kueri terlalu pendek ditolak lebih dulu
+  await page.locator('#admin-q').fill('Bo');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(600);
+  await expect(page.locator('#admin-status')).toContainText('minimal 3 huruf');
+
+  // Gagal jaringan -> pesan ramah, bukan crash
+  await page.locator('#admin-q').fill('Bogor');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(2000);
+  await expect(page.locator('#admin-status')).toHaveClass(/is-error/);
+  await expect(page.locator('#admin-status')).toContainText('Gagal mencari');
+});
