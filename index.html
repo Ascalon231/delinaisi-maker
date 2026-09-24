@@ -230,6 +230,16 @@
             <input id="kop-supervisorTitle" type="text" placeholder="mis. Dosen Pembina Studio PWK" maxlength="90">
           </label>
           <div class="field field-tight">
+            <span>Tampilkan bagian peta</span>
+            <div id="blok-toggles" class="blok-toggles"></div>
+            <div class="blok-aksi">
+              <button type="button" id="blok-all-on" class="link-btn">Tampilkan semua</button>
+              <span class="blok-sep">·</span>
+              <button type="button" id="blok-all-off" class="link-btn">Sembunyikan semua</button>
+            </div>
+          </div>
+
+          <div class="field field-tight">
             <span>Logo instansi</span>
             <div class="logo-pick">
               <div id="logo-preview" class="logo-preview">
@@ -242,14 +252,6 @@
               <input type="file" id="logo-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
             </div>
             <p class="hint hint-tight" id="logo-hint">PNG/JPG/SVG, maks 1 MB. Disimpan di browser Anda.</p>
-          </div>
-          <div class="field field-tight">
-            <span>Diagram lokasi (inset)</span>
-            <div class="inset-opts">
-              <label class="toggle toggle-inline">
-                <input type="checkbox" id="kop-inset-show" checked><span>Tampilkan</span>
-              </label>
-            </div>
           </div>
           <label class="field field-tight">
             <span>Peta dasar inset</span>

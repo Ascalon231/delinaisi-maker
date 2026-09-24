@@ -799,8 +799,7 @@ function syncKopInputs() {
     const el = $('#' + id);
     if (el && layout.kop[field] != null) el.value = layout.kop[field];
   });
-  const showEl = $('#kop-inset-show');
-  if (showEl) showEl.checked = layout.kop.insetShow !== false;
+  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
 }
 
 // Pasang layout lembar kop. Hanya ada satu preset, tapi fungsi ini tetap
@@ -819,6 +818,7 @@ function applyTemplate(id) {
   const kopFields = $('#kop-fields');
   if (kopFields) kopFields.classList.remove('hidden');
   syncKopInputs();
+  renderBlokToggles();
 
   const labelToggle = $('#layout-show-labels');
   if (labelToggle) labelToggle.checked = !!layout.showLabels;
@@ -921,16 +921,8 @@ function bindLayout() {
     el.addEventListener('change', commit);
   });
 
-  // Tampilkan/sembunyikan diagram lokasi
-  const showEl = $('#kop-inset-show');
-  if (showEl) {
-    showEl.checked = layout.kop.insetShow !== false;
-    showEl.addEventListener('change', (e) => {
-      layout.kop.insetShow = e.target.checked;
-      if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
-      save();
-    });
-  }
+  // Tampil/sembunyikan diagram lokasi ditangani toggle bagian peta
+  // (blokVis.inset) supaya hanya ada SATU kontrol untuk satu hal.
 
   // Nama fitur di peta (label permanen) — satu-satunya opsi overlay yang
   // masih relevan; legenda/skala/utara/kredit digambar oleh lembar kop.
@@ -1219,6 +1211,72 @@ function resetCategoryColors() {
   if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
   save();
   toast('Warna bawaan dipulihkan');
+}
+
+/* -------------------- Tampil/sembunyi bagian peta -------------------- */
+// Semua bagian lembar Kop Akademik bisa dimatikan pengguna. Keadaannya
+// disimpan di layout.kop.blokVis supaya ikut tersimpan & terbawa saat
+// berkas proyek diekspor.
+function blokTampil(id) {
+  if (!layout.kop.blokVis) layout.kop.blokVis = {};
+  return layout.kop.blokVis[id] !== false;   // default: tampil
+}
+
+function setBlokTampil(id, tampil) {
+  if (!layout.kop.blokVis) layout.kop.blokVis = {};
+  layout.kop.blokVis[id] = !!tampil;
+  if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
+  updateBlokRingkasan();
+  save('Tampilan bagian');
+}
+
+function renderBlokToggles() {
+  const host = $('#blok-toggles');
+  if (!host || typeof FormalSheet === 'undefined' || !FormalSheet.BLOK) return;
+  host.innerHTML = '';
+
+  FormalSheet.BLOK.forEach(b => {
+    const row = document.createElement('label');
+    row.className = 'toggle blok-toggle';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = blokTampil(b.id);
+    cb.setAttribute('aria-label', b.label);
+    cb.addEventListener('change', () => setBlokTampil(b.id, cb.checked));
+    const span = document.createElement('span');
+    span.textContent = b.label;
+    row.appendChild(cb);
+    row.appendChild(span);
+    host.appendChild(row);
+  });
+  updateBlokRingkasan();
+}
+
+function updateBlokRingkasan() {
+  const el = $('#blok-ringkas');
+  if (!el || typeof FormalSheet === 'undefined' || !FormalSheet.BLOK) return;
+  const total = FormalSheet.BLOK.length;
+  const aktif = FormalSheet.BLOK.filter(b => blokTampil(b.id)).length;
+  el.textContent = aktif === total
+    ? 'Semua bagian ditampilkan (' + total + ')'
+    : aktif + ' dari ' + total + ' bagian ditampilkan';
+}
+
+function setSemuaBlok(tampil) {
+  if (typeof FormalSheet === 'undefined' || !FormalSheet.BLOK) return;
+  if (!layout.kop.blokVis) layout.kop.blokVis = {};
+  FormalSheet.BLOK.forEach(b => { layout.kop.blokVis[b.id] = !!tampil; });
+  renderBlokToggles();
+  FormalSheet.scheduleRefresh();
+  save('Tampilan bagian');
+  toast(tampil ? 'Semua bagian ditampilkan' : 'Semua bagian disembunyikan');
+}
+
+function bindBlokToggles() {
+  const on = $('#blok-all-on'), off = $('#blok-all-off');
+  if (on) on.addEventListener('click', () => setSemuaBlok(true));
+  if (off) off.addEventListener('click', () => setSemuaBlok(false));
+  renderBlokToggles();
 }
 
 /* -------------------- Logo instansi (unggah) -------------------- */
@@ -1671,8 +1729,7 @@ function restoreProject(proj) {
     const el = $('#' + id);
     if (el && layout.kop[field] != null) el.value = layout.kop[field];
   });
-  const showEl = $('#kop-inset-show');
-  if (showEl) showEl.checked = layout.kop.insetShow !== false;
+  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
   renderLogoPreview();
 
   applyTemplate(tpl);
@@ -1973,8 +2030,7 @@ function load() {
       const el = $('#' + id);
       if (el && layout.kop[field] != null) el.value = layout.kop[field];
     });
-    const showEl = $('#kop-inset-show');
-    if (showEl) showEl.checked = layout.kop.insetShow !== false;
+  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
 
     // Layout tersimpan. Data lama bisa memuat preset yang sudah dihapus.
     layout.tpl = normalizeTplId(data.layout.tpl);
@@ -2022,6 +2078,7 @@ function load() {
   renderCategoryColors();
   renderCategorySelect();
   renderLogoPreview();
+  renderBlokToggles();
   if (data.basemap && BASEMAPS[data.basemap]) setBasemap(data.basemap);
   if (data.view) {
     try { map.setView([data.view.lat, data.view.lng], data.view.zoom); } catch (e) {}
@@ -2114,8 +2171,7 @@ function applySnapshot(raw) {
         const el = $('#' + id);
         if (el && layout.kop[field] != null) el.value = layout.kop[field];
       });
-      const showEl = $('#kop-inset-show');
-      if (showEl) showEl.checked = layout.kop.insetShow !== false;
+  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
       // Langkah riwayat lama bisa memuat preset yang sudah dihapus.
       layout.tpl = normalizeTplId(L2.tpl);
     }
@@ -2448,6 +2504,9 @@ function init() {
 
   // ---- Riwayat (undo/redo) ----
   bindHistory();
+
+  // ---- Tampil/sembunyi bagian peta ----
+  bindBlokToggles();
 
   // ---- Logo instansi ----
   bindLogoUpload();

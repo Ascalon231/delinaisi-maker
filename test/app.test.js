@@ -1566,14 +1566,14 @@ test('inset: bisa disembunyikan & opsi tersimpan setelah reload', async ({ page 
   await page.locator('#kop-inset-height').selectOption('110');
   await page.waitForTimeout(600);
 
-  // Sembunyikan
-  await page.locator('#kop-inset-show').uncheck();
+  // Sembunyikan lewat toggle bagian peta (satu-satunya kontrol inset)
+  await page.evaluate(() => setBlokTampil('inset', false));
   await page.waitForTimeout(700);
   expect(await page.evaluate(() =>
     getComputedStyle(document.querySelector('.fl-inset-block')).display)).toBe('none');
 
   // Tampilkan lagi
-  await page.locator('#kop-inset-show').check();
+  await page.evaluate(() => setBlokTampil('inset', true));
   await page.waitForTimeout(700);
   expect(await page.evaluate(() =>
     getComputedStyle(document.querySelector('.fl-inset-block')).display)).not.toBe('none');
@@ -2731,4 +2731,132 @@ test('skala: pemilihan jarak membulat ke bawah agar tidak melebihi anggaran', as
   expect(r.f2500).toBe(2000);
   expect(r.f70000).toBe(50000);
   expect(r.tidakMelebihi).toBe(true);
+});
+
+/* ============================================================
+   Tampil/sembunyi setiap bagian peta
+   ============================================================ */
+
+test('bagian peta: semua blok bisa disembunyikan & ditampilkan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  const SEL = {
+    kop: '.fl-blk-kop', activity: '.fl-blk-activity', title: '.fl-blk-title',
+    scale: '.fl-blk-scale', ref: '.fl-blk-ref', inset: '.fl-blk-inset',
+    legend: '.fl-blk-legend', source: '.fl-blk-source', sign: '.fl-blk-sign',
+    grid: '#fl-graticule'
+  };
+  const vis = () => page.evaluate((sel) => {
+    const out = {};
+    for (const k in sel) {
+      const e = document.querySelector(sel[k]);
+      out[k] = e ? getComputedStyle(e).display !== 'none' : null;
+    }
+    return out;
+  }, SEL);
+
+  // Semua tampil secara default
+  const awal = await vis();
+  Object.keys(SEL).forEach(k => expect(awal[k], 'default ' + k).toBe(true));
+
+  // Setiap bagian harus bisa dimatikan SATU PER SATU
+  for (const id of Object.keys(SEL)) {
+    await page.evaluate((i) => setBlokTampil(i, false), id);
+    await page.waitForTimeout(220);
+    const v = await vis();
+    expect(v[id], 'mematikan ' + id).toBe(false);
+    await page.evaluate((i) => setBlokTampil(i, true), id);
+    await page.waitForTimeout(220);
+  }
+
+  // Sembunyikan semua lalu tampilkan semua
+  await page.evaluate(() => setSemuaBlok(false));
+  await page.waitForTimeout(700);
+  const off = await vis();
+  Object.keys(SEL).forEach(k => expect(off[k], 'sembunyikan semua: ' + k).toBe(false));
+
+  await page.evaluate(() => setSemuaBlok(true));
+  await page.waitForTimeout(700);
+  const on = await vis();
+  Object.keys(SEL).forEach(k => expect(on[k], 'tampilkan semua: ' + k).toBe(true));
+});
+
+test('bagian peta: jumlah kontrol sesuai daftar & tersimpan setelah reload', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Jumlah toggle di UI harus sama dengan daftar blok di modul
+  const jumlah = await page.evaluate(() => ({
+    ui: document.querySelectorAll('.blok-toggle').length,
+    daftar: FormalSheet.BLOK.length
+  }));
+  expect(jumlah.ui).toBe(jumlah.daftar);
+  expect(jumlah.ui).toBeGreaterThanOrEqual(10);
+
+  // Matikan beberapa bagian, pastikan tersimpan
+  await page.evaluate(() => {
+    setBlokTampil('legend', false);
+    setBlokTampil('sign', false);
+    setBlokTampil('grid', false);
+  });
+  await page.waitForTimeout(800);
+
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('delinaisi-maker-v1')).layout.kop.blokVis);
+  expect(stored.legend).toBe(false);
+  expect(stored.sign).toBe(false);
+  expect(stored.grid).toBe(false);
+
+  // Pulihkan setelah reload
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d),
+    await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1')));
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2200);
+
+  const sesudah = await page.evaluate(() => ({
+    legend: getComputedStyle(document.querySelector('.fl-blk-legend')).display,
+    sign: getComputedStyle(document.querySelector('.fl-blk-sign')).display,
+    grid: getComputedStyle(document.querySelector('#fl-graticule')).display,
+    tercentang: document.querySelectorAll('.blok-toggle input:checked').length,
+    total: document.querySelectorAll('.blok-toggle').length
+  }));
+  expect(sesudah.legend).toBe('none');
+  expect(sesudah.sign).toBe('none');
+  expect(sesudah.grid).toBe('none');
+  expect(sesudah.tercentang).toBe(sesudah.total - 3);
+});
+
+test('bagian peta: isi teks tidak menimpa keputusan sembunyi', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Dulu judul & judul kegiatan tetap tampil walau dimatikan, karena
+  // fillText() menulis ulang style.display setelah applyBlokPrefs().
+  await page.locator('#layout-title').fill('PETA UJI');
+  await page.locator('#kop-activityTitle').fill('Studio PWK');
+  await page.waitForTimeout(800);
+
+  await page.evaluate(() => {
+    setBlokTampil('title', false);
+    setBlokTampil('activity', false);
+  });
+  await page.waitForTimeout(800);
+
+  // Paksa penyegaran penuh: isi teks TIDAK boleh memunculkan kembali
+  await page.evaluate(() => FormalSheet.refresh());
+  await page.waitForTimeout(700);
+
+  const v = await page.evaluate(() => ({
+    title: getComputedStyle(document.querySelector('.fl-blk-title')).display,
+    activity: getComputedStyle(document.querySelector('.fl-blk-activity')).display,
+    teksMasihAda: document.querySelector('#fl-title').textContent
+  }));
+  expect(v.title).toBe('none');
+  expect(v.activity).toBe('none');
+  expect(v.teksMasihAda).toBe('PETA UJI');   // isi tetap ada, hanya disembunyikan
 });

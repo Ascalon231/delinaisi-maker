@@ -35,11 +35,13 @@ const FormalSheet = (function () {
     return n;
   }
 
+  // Isi teks saja — JANGAN menyentuh style.display. Dulu di sini ditulis
+  // node.style.display = v ? '' : 'none', yang menghapus keputusan
+  // applyBlokPrefs() sehingga toggle "Judul peta" & "Judul kegiatan"
+  // tidak berfungsi. Teks kosong sudah disembunyikan lewat CSS :empty.
   function clearText(node, value) {
     if (!node) return;
-    const v = (value == null ? '' : String(value)).trim();
-    node.textContent = v;
-    node.style.display = v ? '' : 'none';
+    node.textContent = (value == null ? '' : String(value)).trim();
   }
 
   /* -------------------- Membangun kerangka lembar -------------------- */
@@ -66,7 +68,7 @@ const FormalSheet = (function () {
     const panel = el('div', 'fl-panel');
 
     // 1. Kop instansi
-    const bKop = el('div', 'fl-block fl-kop');
+    const bKop = el('div', 'fl-block fl-kop fl-blk-kop');
     const logo = el('div', 'fl-kop-logo');
     logo.innerHTML =
       '<svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="1.5" ' +
@@ -85,17 +87,17 @@ const FormalSheet = (function () {
     panel.appendChild(bKop);
 
     // 2. Judul kegiatan
-    const act = el('div', 'fl-block fl-activity');
+    const act = el('div', 'fl-block fl-activity fl-blk-activity');
     act.id = 'fl-activity';
     panel.appendChild(act);
 
     // 3. Judul peta
-    const title = el('div', 'fl-block fl-title');
+    const title = el('div', 'fl-block fl-title fl-blk-title');
     title.id = 'fl-title';
     panel.appendChild(title);
 
     // 4. Blok skala
-    const bScale = el('div', 'fl-block');
+    const bScale = el('div', 'fl-block fl-blk-scale');
     const scaleRow = el('div', 'fl-scale-row');
     const scaleLeft = el('div', 'fl-scale-left');
     const scaleLabel = el('div', 'fl-scale-label');
@@ -110,7 +112,7 @@ const FormalSheet = (function () {
     panel.appendChild(bScale);
 
     // 5. Sistem referensi
-    const bRef = el('div', 'fl-block');
+    const bRef = el('div', 'fl-block fl-blk-ref');
     const ref = el('div', 'fl-ref');
     [['Proyeksi', 'projection'], ['Zona', 'zone'], ['Datum', 'datum']].forEach(pair => {
       const lab = el('div', 'fl-ref-label', pair[0] + ' :');
@@ -123,7 +125,7 @@ const FormalSheet = (function () {
     panel.appendChild(bRef);
 
     // 6. Diagram lokasi (inset)
-    const bInset = el('div', 'fl-block fl-inset-block');
+    const bInset = el('div', 'fl-block fl-inset-block fl-blk-inset');
     const insetHead = el('div', 'fl-head fl-inset-head', 'Diagram Lokasi:');
     const insetWrap = el('div', 'fl-inset-wrap');
     const insetDiv = el('div', 'fl-inset-map');
@@ -139,7 +141,7 @@ const FormalSheet = (function () {
     panel.appendChild(bInset);
 
     // 7. Legenda (tumbuh mengisi ruang)
-    const bLeg = el('div', 'fl-block fl-block--grow');
+    const bLeg = el('div', 'fl-block fl-block--grow fl-blk-legend');
     const legHead = el('div', 'fl-head', 'Legenda:');
     const legBody = el('div', 'fl-legend');
     legBody.id = 'fl-legend';
@@ -148,7 +150,7 @@ const FormalSheet = (function () {
     panel.appendChild(bLeg);
 
     // 8. Sumber data
-    const bSrc = el('div', 'fl-block');
+    const bSrc = el('div', 'fl-block fl-blk-source');
     const srcHead = el('div', 'fl-head', 'Sumber Data dan Riwayat Peta:');
     const srcBody = el('div', 'fl-source');
     srcBody.id = 'fl-source';
@@ -157,7 +159,7 @@ const FormalSheet = (function () {
     panel.appendChild(bSrc);
 
     // 9. Blok pengesahan
-    const bSign = el('div', 'fl-block fl-block--sign');
+    const bSign = el('div', 'fl-block fl-block--sign fl-blk-sign');
     const sign = el('div', 'fl-sign');
     sign.innerHTML =
       '<div class="fl-sign-know">Mengetahui,</div>' +
@@ -273,7 +275,7 @@ const FormalSheet = (function () {
         const s = el('span', 'fl-sign-degree', ', ' + deg);
         nameEl.appendChild(s);
       }
-      nameEl.style.display = name ? '' : 'none';
+      // Biarkan CSS yang menyembunyikan bila kosong.
     }
 
     // Skala numerik
@@ -327,6 +329,36 @@ const FormalSheet = (function () {
 
     if (!map) return;
     FormalLayout.drawGraticule(ctx, map, { x: w, y: h }, { margin: 0 });
+  }
+
+  /* -------------------- Blok yang bisa disembunyikan -------------------- */
+  // Setiap blok panel bisa ditampilkan/disembunyikan oleh pengguna.
+  // Didaftarkan di satu tempat supaya UI pengaturan dan penerapannya
+  // tidak pernah berbeda.
+  const BLOK = [
+    { id: 'kop',      sel: '.fl-blk-kop',      label: 'Kop instansi (logo, prodi, institusi)' },
+    { id: 'activity', sel: '.fl-blk-activity', label: 'Judul kegiatan / studio' },
+    { id: 'title',    sel: '.fl-blk-title',    label: 'Judul peta' },
+    { id: 'scale',    sel: '.fl-blk-scale',    label: 'Skala & arah utara' },
+    { id: 'ref',      sel: '.fl-blk-ref',      label: 'Sistem referensi (proyeksi/zona/datum)' },
+    { id: 'inset',    sel: '.fl-blk-inset',    label: 'Diagram lokasi (inset)' },
+    { id: 'legend',   sel: '.fl-blk-legend',   label: 'Legenda' },
+    { id: 'source',   sel: '.fl-blk-source',   label: 'Sumber data' },
+    { id: 'sign',     sel: '.fl-blk-sign',     label: 'Blok pengesahan' },
+    { id: 'grid',     sel: '#fl-graticule',    label: 'Grid koordinat peta utama' }
+  ];
+
+  // Terapkan preferensi tampil/sembunyi ke seluruh blok.
+  function applyBlokPrefs() {
+    const k = kop();
+    const blokVis = (k.blokVis && typeof k.blokVis === 'object') ? k.blokVis : {};
+    BLOK.forEach(b => {
+      const e = document.querySelector(b.sel);
+      if (!e) return;
+      // Default: tampil. Hanya disembunyikan bila user mematikannya.
+      const tampil = blokVis[b.id] !== false;
+      e.style.display = tampil ? '' : 'none';
+    });
   }
 
   /* -------------------- Preferensi inset (dari input user) ------------- */
@@ -412,17 +444,19 @@ const FormalSheet = (function () {
       wrap.style.height = (isFinite(h) ? h : 150) + 'px';
     }
 
-    const block = document.querySelector('.fl-inset-block');
+    // PENTING: bagian ini TIDAK mengatur display blok inset. Dulu di sini
+    // ditulis block.style.display = '', yang menimpa keputusan
+    // applyBlokPrefs() sehingga toggle "Diagram lokasi" tidak berfungsi.
+    // Yang diatur di sini hanya isi & judulnya.
     const head = document.querySelector('.fl-inset-head');
     const show = k.insetShow !== false;
-    if (block) block.style.display = show ? '' : 'none';
     if (head) {
       const label = (k.insetLabel == null ? 'Diagram Lokasi:' : k.insetLabel).trim();
       head.textContent = label;
-      head.style.display = label ? '' : 'none';
+      head.style.display = (label && show) ? '' : 'none';
     }
 
-    // Grid inset bisa dimatikan.
+    // Grid DALAM inset bisa dimatikan (terpisah dari grid peta utama).
     const g = document.getElementById('fl-inset-graticule');
     const wantGrid = String(k.insetGrid !== '0');
     if (g) g.style.display = (show && wantGrid === 'true') ? '' : 'none';
@@ -439,8 +473,7 @@ const FormalSheet = (function () {
   function refreshInsetGraticule() {
     const cvs = document.getElementById('fl-inset-graticule');
     if (!cvs || !insetReady || !insetMap) return;
-    if (String(kop().insetGrid) === '0') { cvs.style.display = 'none'; return; }
-    cvs.style.display = '';
+    if (String(kop().insetGrid) === '0') return;   // display diatur applyInsetPrefs
 
     const wrap = cvs.parentNode;
     if (!wrap) return;
@@ -566,6 +599,9 @@ const FormalSheet = (function () {
     refreshGraticule();
     syncInset();
     buildLegend();
+    // Diterapkan TERAKHIR: fungsi-fungsi di atas boleh mengubah isi, tapi
+    // keputusan tampil/sembunyi tiap bagian harus jadi penentu akhir.
+    applyBlokPrefs();
     if (insetMap) { try { insetMap.invalidateSize(); } catch (e) {} }
   }
 
@@ -645,6 +681,7 @@ const FormalSheet = (function () {
 
     refresh: refresh,
     scheduleRefresh: scheduleRefresh,
+    BLOK: BLOK,
 
     // Dipanggil saat user mengubah opsi inset: ganti ubin bila perlu.
     applyInsetOptions: function () {

@@ -35,6 +35,10 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
     peringatan bila dua kategori berwarna sama, serta kategori bisa
     **ditambah, diganti nama, dan dihapus** — semuanya tersimpan otomatis
   - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
+  - **Setiap bagian peta bisa ditampilkan/disembunyikan**: kop instansi,
+    judul kegiatan, judul peta, skala & arah utara, sistem referensi,
+    diagram lokasi, legenda, sumber data, blok pengesahan, dan grid
+    koordinat. Ada tombol "Tampilkan semua" / "Sembunyikan semua"
   - **Diagram lokasi bisa dikustom**: pilih peta dasarnya (Minimal / Jalan /
     Relief / Satelit / Gelap / ikut peta utama), perbesaran zoom-out
     (negara s.d. kabupaten), tinggi kotak, warna kotak cakupan, tampil atau
@@ -99,7 +103,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (79 test)
+# Jalankan test (82 test)
 npm test
 ```
 
