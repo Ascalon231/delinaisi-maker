@@ -1457,6 +1457,65 @@ function bindLogoUpload() {
   renderLogoPreview();
 }
 
+/* -------------------- Skeleton pemuatan -------------------- */
+// Placeholder berbentuk konten, dipakai saat menunggu data yang bisa
+// terasa lambat (memuat data tersimpan, mencari batas administrasi).
+function skeletonDaftarFitur(n) {
+  let html = '';
+  for (let i = 0; i < (n || 3); i++) {
+    html +=
+      '<div class="sk-item" aria-hidden="true">' +
+        '<span class="sk-blok sk-swatch"></span>' +
+        '<span class="sk-baris">' +
+          '<span class="sk-blok sk-judul" style="display:block"></span>' +
+          '<span class="sk-blok sk-meta" style="display:block"></span>' +
+        '</span>' +
+        '<span class="sk-blok sk-aksi"></span>' +
+      '</div>';
+  }
+  return html;
+}
+
+function skeletonHasilBatas(n) {
+  let html = '';
+  for (let i = 0; i < (n || 3); i++) {
+    html +=
+      '<div class="sk-admin" aria-hidden="true">' +
+        '<span class="sk-admin-baris">' +
+          '<span class="sk-blok sk-admin-nama" style="display:block"></span>' +
+          '<span class="sk-blok sk-admin-sub" style="display:block"></span>' +
+        '</span>' +
+        '<span class="sk-blok sk-badge"></span>' +
+      '</div>';
+  }
+  return html;
+}
+
+// Tampilkan skeleton di daftar fitur selama memuat. Fungsi yang
+// dikembalikan hanya MENGHAPUS skeleton (mengosongkan daftar), tidak
+// memulihkan isi lama — kalau memulihkan, hasil renderList() yang asli
+// akan tertimpa dan daftar fitur tampak kosong.
+function tampilkanSkeletonDaftar() {
+  const list = $('#feat-list');
+  const empty = $('#feat-empty');
+  if (!list) return null;
+  if (empty) empty.style.display = 'none';
+  list.innerHTML = skeletonDaftarFitur(3);
+  let aktif = true;
+  const timer = setTimeout(() => {
+    // Jaring pengaman: kalau pemuatan gagal, jangan biarkan skeleton
+    // menggantung selamanya.
+    if (aktif && list.querySelector('.sk-item')) list.innerHTML = '';
+  }, 5000);
+  return () => {
+    aktif = false;
+    clearTimeout(timer);
+    // Hanya bersihkan bila isinya memang masih skeleton; kalau
+    // renderList() sudah menulis, biarkan.
+    if (list.querySelector('.sk-item')) list.innerHTML = '';
+  };
+}
+
 /* -------------------- Batas administrasi (lapisan terpisah) -------------------- */
 // Lapisan ini sengaja TIDAK ikut menjadi fitur delinasi: ia hanya latar
 // acuan. User tetap bisa menggambar di atasnya.
@@ -1528,6 +1587,10 @@ function runAdminSearch() {
   const level = $('#admin-level').value;
   btn.disabled = true;
   adminStatus('Mencari batas…');
+  // Skeleton berbentuk kartu hasil, supaya tata letak tidak melompat
+  // saat hasil asli muncul.
+  const box = $('#admin-results');
+  if (box) box.innerHTML = skeletonHasilBatas(3);
 
   AdminBoundaries.search(q, level)
     .then(({ results, fromCache }) => {
@@ -2025,6 +2088,10 @@ function load() {
   catch (e) { data = null; }
   if (!data || !Array.isArray(data.features)) return;
 
+  // Data tersimpan ada: tampilkan skeleton selama memuat agar pengguna
+  // tahu ada pekerjaan yang sedang dipulihkan (bukan layar kosong).
+  const selesaiSkeleton = data.features.length ? tampilkanSkeletonDaftar() : null;
+
   idSeq = data.seq || 0;
 
   // Muat pengaturan layout
@@ -2101,6 +2168,7 @@ function load() {
   });
 
   renderList();
+  if (selesaiSkeleton) selesaiSkeleton();
   renderCategoryColors();
   renderCategorySelect();
   renderLogoPreview();

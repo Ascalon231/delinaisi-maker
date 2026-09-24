@@ -2425,3 +2425,95 @@ test('desain: placeholder & pesan memakai contoh nyata, bukan generik', async ({
   expect(ph.join(' | ')).toContain('Hasanuddin');
   expect(ph.join(' | ')).toContain('Rahmat Hidayat');
 });
+
+/* ============================================================
+   Halaman 404 & skeleton pemuatan
+   ============================================================ */
+
+test('404: halaman sendiri dengan jalan kembali, bukan halaman GitHub polos', async ({ page }) => {
+  const fs = require('fs');
+  const path404 = path.join(__dirname, '..', '404.html');
+  expect(fs.existsSync(path404)).toBe(true);
+
+  const html = fs.readFileSync(path404, 'utf-8');
+
+  // Tanpa dependensi luar supaya tetap tampil walau css/js gagal dimuat
+  expect(html).not.toMatch(/<link[^>]+href="css\//);
+  expect(html).not.toMatch(/<script[^>]+src="js\//);
+  // Bahasa Indonesia & judul yang jelas
+  expect(html).toMatch(/lang="id"/);
+  expect(html).toMatch(/tidak ditemukan/i);
+  // Harus ada jalan kembali (bukan jalan buntu)
+  expect(html).toMatch(/Kembali ke peta/);
+  expect(html).toMatch(/href="\.\/"/);
+  // Tidak diindeks mesin pencari
+  expect(html).toMatch(/name="robots"[^>]*noindex/);
+
+  // Favicon + warna tema konsisten dengan aplikasi utama
+  expect(html).toMatch(/rel="icon"/);
+  expect(html).toMatch(/theme-color/);
+
+  // Tampil benar di browser
+  await page.goto(require('url').pathToFileURL(path404).href);
+  await expect(page.locator('h2')).toContainText('tidak ada');
+  await expect(page.locator('a.btn-utama')).toBeVisible();
+  await expect(page.locator('.kode')).toHaveText(/404/);
+});
+
+test('skeleton: muncul saat mencari batas lalu digantikan hasil', async ({ page }) => {
+  // Tunda respons agar skeleton sempat terlihat
+  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+    await new Promise(r => setTimeout(r, 1200));
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify([{ display_name: 'Bogor, Jawa Barat', name: 'Bogor',
+        category: 'boundary', type: 'administrative', place_rank: 12,
+        osm_type: 'relation', osm_id: 1,
+        geojson: { type: 'Polygon',
+          coordinates: [Array.from({ length: 60 }, (_, i) => [106.7 + i * 0.001, -6.5])] } }]) });
+  });
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('#admin-q').fill('Bogor');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(400);
+
+  // Skeleton berbentuk kartu hasil, bukan spinner
+  expect(await page.locator('.sk-admin').count()).toBeGreaterThan(0);
+
+  // Setelah hasil tiba, skeleton hilang & hasil asli tampil
+  // (fixture berisi 1 batas sah; entri "kantor" tersaring oleh filter)
+  await expect(page.locator('.admin-item')).toHaveCount(1, { timeout: 8000 });
+  expect(await page.locator('.sk-admin').count()).toBe(0);
+});
+
+test('skeleton: daftar fitur tidak tertimpa saat memuat data tersimpan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.waitForTimeout(900);
+  const stored = await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1'));
+  expect(JSON.parse(stored).features).toHaveLength(3);
+
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d), stored);
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  // Daftar fitur harus terisi — dulu skeleton menimpanya sehingga kosong
+  await expect(page.locator('#feat-count')).toHaveText('3');
+  await expect(page.locator('.feat')).toHaveCount(3);
+  // Skeleton tidak boleh menggantung
+  expect(await page.locator('.sk-item').count()).toBe(0);
+});
+
+test('skeleton: hormati prefers-reduced-motion', async ({ page }) => {
+  const css = require('fs').readFileSync(
+    path.join(__dirname, '..', 'css', 'style.css'), 'utf-8');
+  // Animasi gelombang dimatikan bagi pengguna yang memintanya
+  expect(css).toMatch(/prefers-reduced-motion[\s\S]{0,220}\.sk-blok\s*\{\s*animation:\s*none/);
+});

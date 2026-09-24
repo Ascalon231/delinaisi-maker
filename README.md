@@ -102,7 +102,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (68 test)
+# Jalankan test (72 test)
 npm test
 ```
 
@@ -157,6 +157,7 @@ Tidak ada backend, tidak ada database, tidak ada pelacakan.
 │   ├── formal-layout.js    # Graticule, skala batang, format DMS
 │   ├── formal-sheet.js     # Lembar 2 kolom, inset, legenda otomatis
 │   └── print-layout.js     # PaperLayout: ekspor PNG & cetak
+├── 404.html                # Halaman alamat salah (dipakai GitHub Pages)
 ├── test/app.test.js        # Test otomatis (Playwright)
 └── README.md
 ```

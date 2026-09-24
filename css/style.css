@@ -940,3 +940,46 @@ button, .tool, .tpl-row button, .icon-btn, .feat-item {
   outline: 2px solid #fff;
   outline-offset: 2px;
 }
+
+/* ================= SKELETON LOADER ================= */
+/* Skeleton berbentuk konten (bukan spinner) supaya tata letak tidak
+   melompat saat data asli muncul, dan pengguna tahu apa yang sedang
+   dimuat. Dipakai saat memuat data tersimpan & mencari batas. */
+.sk-item {
+  display: flex; align-items: center; gap: 9px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 9px 10px; margin-bottom: 7px; background: #fff;
+}
+.sk-blok {
+  background: linear-gradient(90deg, #eef2f7 0%, #f7fafd 50%, #eef2f7 100%);
+  background-size: 200% 100%;
+  border-radius: var(--r-xs);
+  animation: sk-gelombang 1.4s ease-in-out infinite;
+}
+.sk-swatch { width: 12px; height: 12px; border-radius: var(--r-xs); flex: none; }
+.sk-baris { flex: 1 1 auto; min-width: 0; }
+.sk-judul { height: 11px; width: 62%; margin-bottom: 6px; }
+.sk-meta  { height: 9px;  width: 42%; }
+.sk-aksi  { width: 58px; height: 22px; flex: none; border-radius: var(--r-sm); }
+
+/* Skeleton untuk hasil pencarian batas administrasi */
+.sk-admin {
+  display: flex; align-items: center; gap: 9px;
+  border: 1px solid var(--line); border-radius: var(--r-md);
+  padding: 8px 10px; margin-bottom: 5px; background: #fbfcfe;
+}
+.sk-admin-baris { flex: 1 1 auto; min-width: 0; }
+.sk-admin-nama { height: 11px; width: 55%; margin-bottom: 6px; }
+.sk-admin-sub  { height: 8px;  width: 78%; }
+.sk-badge { width: 46px; height: 15px; flex: none; border-radius: var(--r-sm); }
+
+@keyframes sk-gelombang {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Hormati preferensi pengguna: tanpa animasi, tetap terlihat sebagai
+   placeholder abu statis. */
+@media (prefers-reduced-motion: reduce) {
+  .sk-blok { animation: none; background: #eef2f7; }
+}
