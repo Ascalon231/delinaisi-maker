@@ -823,3 +823,20 @@ button, .tool, .tpl-row button, .icon-btn, .feat-item {
 .admin-loaded-meta { font-size: 10.5px; color: #3f7a5c; margin-top: 2px; }
 
 #admin-status.is-error { color: var(--danger); }
+
+/* ================= UNGGAH LOGO INSTANSI ================= */
+.logo-pick { display: flex; align-items: center; gap: 9px; margin-top: 2px; }
+.logo-preview {
+  width: 52px; height: 52px; flex: none;
+  border: 1.5px dashed #c8d3e2; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  background: #fbfcfe; cursor: pointer; overflow: hidden;
+  transition: border-color .15s, background .15s;
+}
+.logo-preview:hover { border-color: var(--primary); background: #f2f6fd; }
+.logo-preview.dragging { border-color: var(--primary); background: #e8efff; }
+.logo-preview.has-logo { border-style: solid; border-color: var(--line); background: #fff; }
+.logo-preview img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.logo-pick-actions { display: flex; flex-direction: column; gap: 5px; flex: 1 1 auto; }
+.logo-pick-actions .btn { width: 100%; }
+.logo-pick-actions .btn:disabled { opacity: .4; cursor: not-allowed; }

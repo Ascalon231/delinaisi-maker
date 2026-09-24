@@ -209,8 +209,34 @@ const FormalSheet = (function () {
   }
 
   /* -------------------- Mengisi teks dari state -------------------- */
+  // Logo: tampilkan unggahan user bila ada; jika tidak, placeholder netral.
+  function renderLogo() {
+    const box = document.querySelector('.fl-kop-logo');
+    if (!box) return;
+    const k = (layout && layout.kop) || {};
+    const url = k.logo || '';
+    if (box.dataset.logo === url) return;   // tidak berubah -> jangan sentuh DOM
+    box.dataset.logo = url;
+    if (url) {
+      box.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = url;
+      img.alt = k.institution ? ('Logo ' + k.institution) : 'Logo instansi';
+      box.appendChild(img);
+      box.classList.add('has-logo');
+    } else {
+      box.classList.remove('has-logo');
+      box.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" stroke="#111" stroke-width="1.5" ' +
+        'stroke-linejoin="round" stroke-linecap="round">' +
+        '<path d="M12 2 L20 6 v6 c0 5 -3.4 8.4 -8 10 -4.6 -1.6 -8 -5 -8 -10 V6 z"/>' +
+        '<path d="M12 7 v8 M8.5 11 h7"/></svg>';
+    }
+  }
+
   function fillText() {
     if (!built) return;
+    renderLogo();
     const k = (layout && layout.kop) || {};
 
     clearText(document.getElementById('fl-kop-study'), k.programStudy);

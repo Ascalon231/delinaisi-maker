@@ -863,7 +863,15 @@ test('peta dasar: semua pilihan tanpa API key & benar-benar memuat ubin', async 
       loaded: document.querySelectorAll('#map .leaflet-tile-loaded').length
     }), id);
     expect(st.aktif).toBe(true);
-    if (id !== 'none') expect(st.loaded).toBeGreaterThan(0);
+    // Server ubin publik bisa lambat; tunggu sebentar alih-alih menuntut
+    // hasil dalam satu jendela waktu yang kaku (dulu membuat test flaky).
+    if (id !== 'none') {
+      await expect
+        .poll(() => page.evaluate(() =>
+          document.querySelectorAll('#map .leaflet-tile-loaded').length),
+          { timeout: 15000, message: 'ubin ' + id + ' tidak termuat' })
+        .toBeGreaterThan(0);
+    }
   }
 
   expect(errs).toEqual([]);
@@ -1207,4 +1215,154 @@ test('batas administrasi: pesan bantuan muncul saat tidak ada hasil', async ({ p
   await expect(status).toContainText('Tidak Ada');       // kueri bersih disebut
   await expect(status).toContainText('OpenStreetMap');   // saran penulisan
   await expect(page.locator('.admin-empty')).toHaveCount(1);
+});
+
+/* ============================================================
+   Logo instansi & posisi teks lembar formal
+   ============================================================ */
+
+// PNG kecil yang valid, dibuat di dalam test (tanpa file eksternal).
+const TINY_PNG_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAIAQMAAAD+wSzIAAAABlBMVEX/3gAoAAAAFElEQVR4nGP4z8Dwn4GBgYGBgQEAFQIC/8Q5MgAAAAAASUVORK5CYII=';
+
+test('logo instansi: unggah, tampil di lembar, dan hapus', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1200);
+
+  // Awal: placeholder, tombol hapus nonaktif
+  await expect(page.locator('.fl-kop-logo svg')).toHaveCount(1);
+  await expect(page.locator('#logo-remove-btn')).toBeDisabled();
+
+  // Unggah
+  await page.setInputFiles('#logo-input', {
+    name: 'logo.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_B64, 'base64')
+  });
+  await page.waitForTimeout(1500);
+
+  // Muncul di pratinjau sidebar DAN di lembar formal
+  await expect(page.locator('#logo-preview img')).toHaveCount(1);
+  await expect(page.locator('.fl-kop-logo img')).toHaveCount(1);
+  await expect(page.locator('.fl-kop-logo svg')).toHaveCount(0);
+  await expect(page.locator('#logo-remove-btn')).toBeEnabled();
+
+  // Placeholder tidak lagi punya bingkai; logo asli tampil bersih
+  const hasLogoClass = await page.locator('.fl-kop-logo').evaluate(e => e.classList.contains('has-logo'));
+  expect(hasLogoClass).toBe(true);
+
+  // Hapus
+  await page.locator('#logo-remove-btn').click();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.fl-kop-logo img')).toHaveCount(0);
+  await expect(page.locator('.fl-kop-logo svg')).toHaveCount(1);
+  await expect(page.locator('#logo-remove-btn')).toBeDisabled();
+});
+
+test('logo instansi: tersimpan sebagai data URL & pulih setelah reload', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1000);
+  await page.setInputFiles('#logo-input', {
+    name: 'logo-instansi.png', mimeType: 'image/png', buffer: Buffer.from(TINY_PNG_B64, 'base64')
+  });
+  await page.waitForTimeout(1500);
+
+  const stored = await page.evaluate(() => {
+    const d = JSON.parse(localStorage.getItem('delinaisi-maker-v1'));
+    return { logo: d.layout.kop.logo || '', nama: d.layout.kop.logoName };
+  });
+  expect(stored.logo).toMatch(/^data:image\/png;base64,/);
+  expect(stored.nama).toBe('logo-instansi.png');
+
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d),
+    await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1')));
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  await expect(page.locator('.fl-kop-logo img')).toHaveCount(1);
+  await expect(page.locator('#logo-preview img')).toHaveCount(1);
+});
+
+test('logo instansi: tolak file bukan gambar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1000);
+
+  await page.setInputFiles('#logo-input', {
+    name: 'dokumen.txt', mimeType: 'text/plain', buffer: Buffer.from('bukan gambar')
+  });
+  await page.waitForTimeout(1000);
+
+  // Logo tidak berubah & ada pemberitahuan
+  expect(await page.evaluate(() => (layout.kop.logo || '').length)).toBe(0);
+  await expect(page.locator('#toast')).toContainText('Format logo');
+});
+
+test('lembar formal: posisi teks sesuai tata letak kop', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1200);
+
+  await page.locator('#layout-title').fill('PETA DELINASI WILAYAH STUDI');
+  await page.locator('#kop-programStudy').fill('Perencanaan Wilayah dan Kota');
+  await page.locator('#kop-institution').fill('Universitas Contoh');
+  await page.waitForTimeout(900);
+
+  const align = await page.evaluate(() => ({
+    kop: getComputedStyle(document.querySelector('.fl-kop')).textAlign,
+    activity: getComputedStyle(document.querySelector('.fl-activity')).textAlign,
+    title: getComputedStyle(document.querySelector('.fl-title')).textAlign
+  }));
+  // Kop rata kiri sejajar logo; judul kegiatan & judul peta di tengah
+  expect(align.kop).toBe('left');
+  expect(align.activity).toBe('center');
+  expect(align.title).toBe('center');
+
+  // Kop: logo di kiri teks, sejajar
+  const kop = await page.evaluate(() => {
+    const l = document.querySelector('.fl-kop-logo').getBoundingClientRect();
+    const t = document.querySelector('.fl-kop-text').getBoundingClientRect();
+    return { logoKiri: l.left < t.left, sejajar: Math.abs(l.top - t.top) < 40 };
+  });
+  expect(kop.logoKiri).toBe(true);
+  expect(kop.sejajar).toBe(true);
+
+  // Blok pengesahan berada di sisi KANAN panel (kolom tanda tangan)
+  // Yang penting: blok tanda tangan menempel ke sisi KANAN panel, dengan
+  // lebar terbatas (kolom tanda tangan), bukan melebar penuh.
+  const sign = await page.evaluate(() => {
+    const s = document.querySelector('.fl-sign').getBoundingClientRect();
+    const b = document.querySelector('.fl-block--sign').getBoundingClientRect();
+    const p = document.querySelector('.fl-panel').getBoundingClientRect();
+    return {
+      jarakKanan: Math.round(p.right - s.right),
+      jarakKiri: Math.round(s.left - p.left),
+      lebar: Math.round(s.width),
+      lebarPanel: Math.round(p.width),
+      rataKanan: Math.abs(b.right - s.right) < 24
+    };
+  });
+  expect(sign.rataKanan).toBe(true);
+  expect(sign.jarakKanan).toBeLessThan(30);   // menempel kanan
+  expect(sign.jarakKiri).toBeGreaterThan(40); // ada ruang kosong di kiri
+  expect(sign.lebar).toBeGreaterThan(120);
+  expect(sign.lebar).toBeLessThan(sign.lebarPanel);
+
+  // Urutan blok tetap sesuai standar kop
+  const urutan = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.fl-panel > .fl-block'))
+      .map(b => Math.round(b.getBoundingClientRect().y)));
+  const menaik = urutan.every((y, i) => i === 0 || y >= urutan[i - 1]);
+  expect(menaik).toBe(true);
 });

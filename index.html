@@ -216,6 +216,20 @@
             <span>Jabatan pembimbing</span>
             <input id="kop-supervisorTitle" type="text" placeholder="mis. Dosen Pembina Studio PWK" maxlength="90">
           </label>
+          <div class="field field-tight">
+            <span>Logo instansi</span>
+            <div class="logo-pick">
+              <div id="logo-preview" class="logo-preview">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#b3bccb" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3 L20.5 8 v9 L12 21 L3.5 17 v-9 z"/><path d="M12 3 v18"/></svg>
+              </div>
+              <div class="logo-pick-actions">
+                <button type="button" id="logo-upload-btn" class="btn btn-secondary btn-sm">Unggah logo</button>
+                <button type="button" id="logo-remove-btn" class="btn btn-danger-ghost btn-sm">Hapus</button>
+              </div>
+              <input type="file" id="logo-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+            </div>
+            <p class="hint hint-tight" id="logo-hint">PNG/JPG/SVG, maks 1 MB. Disimpan di browser Anda.</p>
+          </div>
           <div class="kop-grid">
             <label class="field field-tight">
               <span>Nama pembuat peta</span>

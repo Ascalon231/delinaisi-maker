@@ -618,7 +618,7 @@ function setBasemap(id, skipSave) {
 /* -------------------- Layout peta (judul, legenda, utara, kredit) ---------- */
 // Nilai awal field kop akademik (semua tetap bisa diubah user).
 const KOP_DEFAULTS = {
-  programStudy: '', institution: '',
+  programStudy: '', institution: '', logo: '', logoName: '',
   activityTitle: '', activityYear: String(new Date().getFullYear()),
   projection: 'Universal Transverse Mercator', zone: 'UTM 52S', datum: 'WGS 1984',
   sourceData: '', supervisorTitle: '', mapmakerName: '', mapmakerDegree: ''
@@ -1122,6 +1122,144 @@ function resetCategoryColors() {
   toast('Warna bawaan dipulihkan');
 }
 
+/* -------------------- Logo instansi (unggah) -------------------- */
+// Logo disimpan sebagai data URL di localStorage. Karena kuota localStorage
+// terbatas (~5 MB), gambar diperkecil dulu lewat canvas sebelum disimpan.
+const LOGO_MAX_BYTES = 1024 * 1024;   // batas file mentah yang diterima
+const LOGO_TARGET_PX = 240;           // sisi terpanjang setelah diperkecil
+
+function setLogo(dataUrl, meta) {
+  layout.kop.logo = dataUrl || '';
+  layout.kop.logoName = (meta && meta.name) || layout.kop.logoName || '';
+  renderLogoPreview();
+  if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
+  save();
+}
+
+function renderLogoPreview() {
+  const box = $('#logo-preview');
+  const removeBtn = $('#logo-remove-btn');
+  if (!box) return;
+  const url = (layout.kop && layout.kop.logo) || '';
+  if (url) {
+    box.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Logo instansi';
+    box.appendChild(img);
+    box.classList.add('has-logo');
+    if (removeBtn) removeBtn.disabled = false;
+  } else {
+    box.innerHTML =
+      '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#b3bccb" ' +
+      'stroke-width="1.5" stroke-linejoin="round"><path d="M12 3 L20.5 8 v9 L12 21 L3.5 17 v-9 z"/>' +
+      '<path d="M12 3 v18"/></svg>';
+    box.classList.remove('has-logo');
+    if (removeBtn) removeBtn.disabled = true;
+  }
+}
+
+// Perkecil gambar agar hemat kuota; SVG dibiarkan (vektornya sudah kecil).
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Gagal membaca file'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      if (file.type === 'image/svg+xml') { resolve(dataUrl); return; }
+
+      const img = new Image();
+      // Sebagian PNG (mis. colormap/indexed dari alat tertentu) tidak bisa
+      // didekode oleh Image(). Itu bukan alasan menolak logo user — pakai
+      // berkas aslinya saja selama ukurannya masih wajar.
+      img.onerror = () => {
+        if (file.size <= LOGO_MAX_BYTES) resolve(dataUrl);
+        else reject(new Error('Gambar tidak bisa dibaca'));
+      };
+      img.onload = () => {
+        const max = LOGO_TARGET_PX;
+        let { width: w, height: h } = img;
+        if (!w || !h) { resolve(dataUrl); return; }
+        if (Math.max(w, h) > max) {
+          const scale = max / Math.max(w, h);
+          w = Math.round(w * scale);
+          h = Math.round(h * scale);
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        try {
+          ctx.drawImage(img, 0, 0, w, h);
+          // PNG agar transparansi logo tetap terjaga.
+          resolve(c.toDataURL('image/png'));
+        } catch (e) {
+          // Canvas gagal (mis. gambar bermasalah) -> pakai aslinya.
+          resolve(dataUrl);
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function handleLogoFile(file) {
+  if (!file) return;
+  if (!/^image\/(png|jpeg|jpg|svg\+xml|webp)$/.test(file.type)) {
+    toast('Format logo harus PNG, JPG, SVG, atau WebP');
+    return;
+  }
+  if (file.size > LOGO_MAX_BYTES) {
+    toast('Logo terlalu besar (maks 1 MB). Kompres dulu ya.');
+    return;
+  }
+  shrinkImage(file)
+    .then(dataUrl => {
+      setLogo(dataUrl, { name: file.name });
+      toast('Logo instansi dipasang');
+    })
+    .catch(err => toast('Gagal memuat logo: ' + (err && err.message ? err.message : err)));
+}
+
+function bindLogoUpload() {
+  const btn = $('#logo-upload-btn');
+  const input = $('#logo-input');
+  const removeBtn = $('#logo-remove-btn');
+  if (!btn || !input) return;
+
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    handleLogoFile(f);
+    e.target.value = '';
+  });
+
+  // Dukungan seret-lepas ke kotak pratinjau.
+  const box = $('#logo-preview');
+  if (box) {
+    ['dragenter', 'dragover'].forEach(ev => box.addEventListener(ev, (e) => {
+      e.preventDefault(); box.classList.add('dragging');
+    }));
+    ['dragleave', 'drop'].forEach(ev => box.addEventListener(ev, (e) => {
+      e.preventDefault(); box.classList.remove('dragging');
+    }));
+    box.addEventListener('drop', (e) => {
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      handleLogoFile(f);
+    });
+    box.addEventListener('click', () => input.click());
+  }
+
+  if (removeBtn) {
+    removeBtn.addEventListener('click', () => {
+      setLogo('', null);
+      toast('Logo dihapus');
+    });
+  }
+
+  renderLogoPreview();
+}
+
 /* -------------------- Batas administrasi (lapisan terpisah) -------------------- */
 // Lapisan ini sengaja TIDAK ikut menjadi fitur delinasi: ia hanya latar
 // acuan. User tetap bisa menggambar di atasnya.
@@ -1570,6 +1708,7 @@ function load() {
   renderList();
   renderCategoryColors();
   renderCategorySelect();
+  renderLogoPreview();
   if (data.basemap && BASEMAPS[data.basemap]) setBasemap(data.basemap);
   if (data.view) {
     try { map.setView([data.view.lat, data.view.lng], data.view.zoom); } catch (e) {}
@@ -1805,6 +1944,9 @@ function init() {
       toggleEdit();
     }
   });
+
+  // ---- Logo instansi ----
+  bindLogoUpload();
 
   // ---- Batas administrasi ----
   bindAdminBoundaries();
