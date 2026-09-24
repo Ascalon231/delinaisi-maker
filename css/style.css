@@ -573,22 +573,11 @@ kbd {
   #map-credit { bottom: 70px; right: 10px; display: none; }
 }
 
-/* ================= PRINT ================= */
-@media print {
-  @page { margin: 0; }
-  body { overflow: visible; }
-  #topbar, #sidebar, #search-box, #coord-badge, #measure-badge,
-  #modal-overlay, #help-overlay, .toast, .leaflet-control-zoom { display: none !important; }
-  #app { display: block; height: auto; }
-  #map-wrap { position: static; width: 100%; height: 100vh; }
-  #map { position: absolute; inset: 0; }
-  .leaflet-container { background: #fff; }
-  /* Elemen layout tampil saat cetak */
-  #map-title { max-width: calc(100% - 40px); top: 18px; font-size: 17px; padding: 9px 22px; }
-  #map-legend { top: 70px; right: 18px; }
-  #map-north { bottom: 60px; right: 20px; }
-  #map-credit { bottom: 20px; right: 20px; font-size: 11.5px; }
-}
+/* ================= PRINT =================
+   Aturan cetak sengaja DIPUSATKAN di css/print-layout.css saja.
+   Sebelumnya file ini juga punya @media print untuk #map-wrap dengan
+   nilai yang bertabrakan (position/height), sehingga tata letak berubah
+   saat dicetak. Jangan tambahkan aturan cetak di sini lagi. */
 
 /* ================= A11Y & MOTION (pedoman Web Interface Guidelines) ================= */
 

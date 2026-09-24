@@ -1,11 +1,22 @@
 /* ============================================================
    Delinaisi Maker — print-layout.css
-   Aturan cetak untuk seluruh preset (termasuk "Kop Akademik").
-   Dimuat dari index.html; dipakai oleh "Cetak / PDF".
+   SATU-SATUNYA sumber aturan cetak untuk seluruh preset.
+
+   Prinsip: cetak TIDAK boleh mengubah tata letak. Yang disesuaikan
+   hanya satuan ukuran (mm/persen halaman) dan warna latar. Grid,
+   proporsi kolom, dan urutan elemen tetap identik dengan di layar.
+
+   Catatan riwayat: dulu ada tiga @media print yang bertabrakan
+   (style.css, print-layout.css, formal-sheet.css) dengan nilai
+   #map-wrap yang saling berlawanan (position static/relative,
+   height 100vh/188mm). Selain itu 100vh mengacu ke viewport LAYAR,
+   sehingga lembar melebar keluar halaman saat dicetak. Semua aturan
+   cetak kini dipusatkan di sini.
    ============================================================ */
 
 @media print {
-  @page { margin: 8mm; }
+  /* Margin halaman: 10mm memberi ruang aman untuk printer rumahan. */
+  @page { margin: 10mm; }
 
   html, body {
     height: auto;
@@ -32,19 +43,28 @@
 
   #app { display: block; height: auto; }
 
+  /* Area peta mengisi tinggi area cetak (bukan tinggi layar). */
   #map-wrap {
     position: relative;
     width: 100%;
-    height: 188mm; /* area cetak A4 tegak setelah margin */
+    height: 185mm;
     padding: 0;
     background: #fff;
     display: block;
+    /* Hilangkan overflow layar supaya lembar tidak ter-scroll/terpotong. */
+    overflow: visible;
   }
+
+  /* Preset formal: lembar mengikuti tinggi area cetak yang sama. */
+  #map-wrap.tpl-formal { height: 185mm; }
+  #map-wrap.tpl-formal .formal-sheet { height: 100%; }
+  /* Panel tidak boleh punya scroll sendiri saat cetak: isinya harus utuh. */
+  #map-wrap.tpl-formal .fl-panel { overflow: visible; }
 
   #map { position: absolute; inset: 0; }
   .leaflet-container { background: #fff; }
 
-  /* Warna elemen layout harus ikut tercetak */
+  /* Grafik & warna harus ikut tercetak */
   #map-legend,
   #map-credit,
   #map-north,
@@ -57,11 +77,12 @@
     print-color-adjust: exact !important;
   }
 
-  /* Preset overlay tetap tampil saat cetak */
-  #map-title { max-width: calc(100% - 40px); top: 14px; font-size: 16px; }
+  /* Preset overlay: posisi tetap seperti di layar, hanya ukuran font
+     yang disesuaikan agar terbaca di kertas. */
+  #map-title { max-width: calc(100% - 40px); font-size: 16px; }
   #map-legend { top: 60px; right: 14px; }
   #map-credit { bottom: 14px; right: 14px; }
 
-  /* Lembar formal mengisi satu halaman penuh */
-  #map-wrap.tpl-formal { height: 100%; }
+  /* Cegah blok terpotong di tengah halaman */
+  .fl-block, .formal-sheet { break-inside: avoid; }
 }

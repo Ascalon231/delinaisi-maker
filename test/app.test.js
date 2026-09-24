@@ -1796,3 +1796,111 @@ test('ekspor PNG: border lembar & label berada di dalam gambar', async ({ page }
   expect(edge.atas).toBeGreaterThan(0);
   expect(edge.bawah).toBeGreaterThan(0);
 });
+
+/* ============================================================
+   Cetak / PDF tidak boleh mengubah tata letak
+   ============================================================ */
+
+test('cetak: proporsi & urutan blok sama seperti di layar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1800);
+
+  const ukur = () => page.evaluate(() => {
+    const sb = document.querySelector('.formal-sheet').getBoundingClientRect();
+    const mb = document.querySelector('.fl-map-col').getBoundingClientRect();
+    return {
+      petaPersen: +(mb.width / sb.width * 100).toFixed(1),
+      blok: Array.from(document.querySelectorAll('.fl-panel > .fl-block'))
+        .map(x => Math.round(x.getBoundingClientRect().height)),
+      legenda: document.querySelectorAll('#fl-legend .fl-legend-item').length,
+      sheetTinggiAda: sb.height > 100
+    };
+  });
+
+  const layar = await ukur();
+  expect(layar.petaPersen).toBeGreaterThan(70);
+  expect(layar.legenda).toBe(3);
+
+  // Ukuran kertas berbeda: proporsi & jumlah blok harus tetap
+  await page.emulateMedia({ media: 'print' });
+  for (const [w, h] of [[794, 1123], [1123, 794], [816, 1056]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(600);
+    const r = await ukur();
+
+    // Proporsi peta tidak boleh berubah jauh (toleransi 3%)
+    expect(Math.abs(r.petaPersen - layar.petaPersen)).toBeLessThan(3);
+    // Struktur tetap: jumlah blok & legenda sama
+    expect(r.blok.length).toBe(layar.blok.length);
+    expect(r.legenda).toBe(layar.legenda);
+    expect(r.sheetTinggiAda).toBe(true);
+  }
+
+  // Tidak ada overflow horizontal halaman
+  const of = await page.evaluate(() => ({
+    doc: document.documentElement.scrollWidth,
+    vw: window.innerWidth
+  }));
+  expect(of.doc).toBeLessThanOrEqual(of.vw + 1);
+  await page.emulateMedia({ media: 'screen' });
+});
+
+test('cetak: hasil PDF satu halaman & elemen penting tetap ada', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1800);
+  await page.locator('#layout-title').fill('PETA DELINASI');
+  await page.locator('#kop-mapmakerName').fill('Nama Mahasiswa');
+  await page.waitForTimeout(900);
+
+  // Elemen penting harus tetap tampil dalam mode cetak
+  await page.emulateMedia({ media: 'print' });
+  await page.waitForTimeout(700);
+
+  const vis = await page.evaluate(() => {
+    const tampil = s => {
+      const e = document.querySelector(s);
+      if (!e) return false;
+      const cs = getComputedStyle(e);
+      return cs.display !== 'none' && cs.visibility !== 'hidden';
+    };
+    return {
+      sheet: tampil('.formal-sheet'),
+      peta: tampil('#map'),
+      panel: tampil('.fl-panel'),
+      inset: tampil('.fl-inset-wrap'),
+      legenda: tampil('#fl-legend'),
+      tandaTangan: tampil('.fl-sign'),
+      // Chrome aplikasi harus tersembunyi
+      sidebar: getComputedStyle(document.querySelector('#sidebar')).display,
+      topbar: getComputedStyle(document.querySelector('#topbar')).display
+    };
+  });
+  expect(vis.sheet).toBe(true);
+  expect(vis.peta).toBe(true);
+  expect(vis.panel).toBe(true);
+  expect(vis.inset).toBe(true);
+  expect(vis.legenda).toBe(true);
+  expect(vis.tandaTangan).toBe(true);
+  expect(vis.sidebar).toBe('none');
+  expect(vis.topbar).toBe('none');
+
+  await page.emulateMedia({ media: 'screen' });
+  await page.waitForTimeout(500);
+
+  // PDF sungguhan (hanya di Chromium headless)
+  const pdf = await page.pdf({ format: 'A4', printBackground: true });
+  expect(pdf.length).toBeGreaterThan(1000);
+  expect(pdf.slice(0, 5).toString()).toBe('%PDF-');
+  const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) || []).length;
+  expect(pages).toBe(1);
+});

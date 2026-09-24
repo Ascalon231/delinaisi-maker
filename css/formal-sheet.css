@@ -246,9 +246,48 @@
 
 /* ---------- Cetak ---------- */
 @media print {
-  #map-wrap.tpl-formal { background: #fff; padding: 0; display: block; }
-  .formal-sheet { border-width: 1.4px; height: 100vh; }
-  .fl-inset-wrap, .fl-map-host { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .fl-legend-swatch, .fl-scalebar-svg rect { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Prinsip: JANGAN mengubah tata letak saat cetak — hanya menyesuaikan
+     satuan ukuran. Grid 2 kolom, proporsi, dan urutan blok tetap sama
+     seperti di layar. Sebelumnya di sini dipakai `height: 100vh` yang
+     mengacu ke VIEWPORT LAYAR, sehingga lembar melebar keluar halaman. */
+  #map-wrap.tpl-formal {
+    background: #fff;
+    padding: 0;
+    display: block;
+    /* Lembar mengisi tinggi area cetak, bukan tinggi layar. */
+    height: 100%;
+    /* Penting: overflow auto di layar membuat lembar bisa ter-scroll dan
+       terpotong saat dicetak. Saat cetak lembar harus pas di halaman. */
+    overflow: visible;
+  }
+
+  .formal-sheet {
+    border-width: 1.4px;
+    /* Ganti 100vh -> 100% agar mengikuti halaman, bukan viewport. */
+    height: 100%;
+    /* Proporsi kolom: panel dibatasi agar tidak memakan porsi berlebihan
+       di halaman sempit (A4 tegak/Letter). Dengan 300px tetap, peta
+       menyusut jadi 62%; dengan min() proporsi kembali ~73%. */
+    grid-template-columns: 1fr min(300px, 27%);
+  }
+
+  /* Warna harus ikut tercetak (background grafis dimatikan browser default) */
+  .fl-inset-wrap,
+  .fl-map-host,
+  .fl-legend-swatch,
+  .fl-scalebar-svg rect,
+  .fl-kop-logo,
+  .fl-kop-logo img,
+  .fl-inset-box,
+  .fl-example-line {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Atribusi basemap disembunyikan di lembar cetak (sudah ada di kredit) */
   .fl-inset-attr { display: none; }
+
+  /* Jangan biarkan blok terpotong di tengah halaman */
+  .fl-block { break-inside: avoid; }
+  .formal-sheet { break-inside: avoid; }
 }
