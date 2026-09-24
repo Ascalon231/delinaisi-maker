@@ -513,7 +513,7 @@ function addFeature(f, openModal) {
   refreshFeature(f);
   features.push(f);
   renderList();
-  save();
+  save('Tambah fitur');
   if (openModal) {
     openAttrModal(f.id, true);
   } else {
@@ -542,7 +542,7 @@ function deleteFeature(id) {
       features.push(removed);
       drawnItems.addLayer(removed.layer);
       renderList();
-      save();
+      save('Pulihkan fitur');
       toast('Fitur dipulihkan');
     }
   });
@@ -559,7 +559,7 @@ function clearAll() {
   });
   features = [];
   renderList();
-  save();
+  save('Hapus semua');
   toast('Semua fitur dihapus', {
     actionLabel: 'Urungkan',
     onAction: () => {
@@ -1945,7 +1945,38 @@ function flashSaved() {
   saveFlashTimer = setTimeout(() => { el.style.background = ''; }, 600);
 }
 
-function save() {
+// Bangun objek state lengkap. Dipisah dari save() supaya bisa dipakai
+// ulang oleh riwayat & cadangan tanpa menyentuh localStorage.
+function buildState() {
+  return {
+      v: 1, seq: idSeq, basemap: currentBasemap,
+      view: { lat: map.getCenter().lat, lng: map.getCenter().lng, zoom: map.getZoom() },
+      layout: { title: layout.title, author: layout.author,
+                showLegend: layout.showLegend, showNorth: layout.showNorth,
+                showScale: layout.showScale, showCredit: layout.showCredit,
+                showLabels: layout.showLabels,
+                tpl: layout.tpl,
+                kop: Object.assign({}, layout.kop) },
+      // Daftar kategori lengkap: warna + nama kustom + kategori tambahan user.
+      catColors: CATEGORIES.reduce((acc, c) => { acc[c.id] = c.color; return acc; }, {}),
+      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color })),
+      features: features.map(f => ({
+        id: f.id, name: f.name, category: f.category, desc: f.desc, type: f.type,
+        geometry: layerToGeometry(f.layer, f.type)
+      }))
+  };
+}
+
+// Rekam keadaan ke riwayat + jadwalkan cadangan. Dipanggil save().
+function recordHistory(label) {
+  try {
+    const raw = JSON.stringify(buildState());
+    if (typeof History !== 'undefined') History.push(raw, label);
+    if (typeof Backup !== 'undefined') Backup.schedule(raw);
+  } catch (e) { /* riwayat bersifat tambahan, jangan ganggu alur utama */ }
+}
+
+function save(label) {
   try {
     const data = {
       v: 1, seq: idSeq, basemap: currentBasemap,
@@ -1965,6 +1996,12 @@ function save() {
       }))
     };
     localStorage.setItem(STORE_KEY, JSON.stringify(data));
+    // Riwayat & cadangan memakai state yang sama (tanpa menyusun ulang).
+    try {
+      const raw = JSON.stringify(data);
+      if (typeof History !== 'undefined') History.push(raw, label);
+      if (typeof Backup !== 'undefined') Backup.schedule(raw);
+    } catch (e2) { /* diabaikan */ }
     flashSaved();
   } catch (e) {
     console.warn('Gagal menyimpan ke browser:', e);
@@ -2073,6 +2110,188 @@ function load() {
   }
 }
 
+/* -------------------- Pemulihan cadangan -------------------- */
+// Kalau data utama hilang/rusak tapi cadangan masih ada, tawarkan
+// pemulihan. Ini jaring pengaman terakhir sebelum pekerjaan benar-benar
+// hilang (localStorage bisa dibersihkan browser atau penuh).
+function cekCadangan() {
+  if (typeof Backup === 'undefined') return;
+  const cad = Backup.read();
+  if (!cad) return;
+
+  let utama = null;
+  try { utama = localStorage.getItem(STORE_KEY); } catch (e) {}
+
+  // Tidak perlu menawarkan bila data utama ada dan sudah memuat fitur.
+  let utamaPunyaFitur = false;
+  try {
+    const d = JSON.parse(utama);
+    utamaPunyaFitur = !!(d && Array.isArray(d.features) && d.features.length);
+  } catch (e) {}
+
+  // Hitung jumlah fitur di cadangan
+  let cadFitur = 0;
+  try {
+    const d = JSON.parse(cad.raw);
+    cadFitur = (d && Array.isArray(d.features)) ? d.features.length : 0;
+  } catch (e) { return; }
+
+  // Tawarkan hanya bila utama kosong/rusak TAPI cadangan berisi data.
+  if (utamaPunyaFitur || cadFitur === 0) return;
+
+  const kapan = cad.at ? new Date(cad.at).toLocaleString('id-ID') : 'sebelumnya';
+  toast('Ditemukan cadangan ' + cadFitur + ' fitur (' + kapan + ')', {
+    actionLabel: 'Pulihkan',
+    onAction: () => {
+      applySnapshot(cad.raw);
+      Backup.clear();
+      toast('Cadangan dipulihkan');
+    }
+  });
+}
+
+/* -------------------- Undo / Redo (riwayat) -------------------- */
+// Terapkan snapshot state ke aplikasi. Dipakai oleh undo & redo.
+// Semua pemulihan dibungkus History.runSuspended supaya proses ini tidak
+// ikut terekam sebagai langkah riwayat baru.
+function applySnapshot(raw) {
+  let data;
+  try { data = JSON.parse(raw); }
+  catch (e) { toast('Riwayat rusak, tidak bisa dipulihkan'); return; }
+
+  History.runSuspended(() => {
+    // Bersihkan fitur & halo yang ada sekarang
+    try { map.closePopup(); } catch (e) {}
+    features.forEach(f => {
+      try { drawnItems.removeLayer(f.layer); } catch (e) {}
+      if (f.__halo && map.__haloGroup) map.__haloGroup.removeLayer(f.__halo);
+    });
+    features = [];
+    if (map.__haloGroup) map.__haloGroup.clearLayers();
+
+    // Kategori (warna & nama)
+    if (Array.isArray(data.categories) && data.categories.length) {
+      CATEGORIES = data.categories
+        .filter(c => c && typeof c.id === 'string')
+        .map(c => ({
+          id: c.id,
+          label: (typeof c.label === 'string' && c.label.trim()) ? c.label : c.id,
+          color: normalizeHex(c.color) || '#6c757d'
+        }));
+      if (!CATEGORIES.length) CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
+    }
+
+    // Layout & kop
+    if (data.layout) {
+      const L2 = data.layout;
+      layout.title = L2.title || '';
+      layout.author = L2.author || '';
+      layout.showLegend = L2.showLegend !== false;
+      layout.showNorth = L2.showNorth !== false;
+      layout.showScale = L2.showScale !== false;
+      layout.showCredit = L2.showCredit !== false;
+      layout.showLabels = L2.showLabels !== false;
+      layout.kop = Object.assign({}, KOP_DEFAULTS, L2.kop || {});
+      const t = $('#layout-title'); if (t) t.value = layout.title;
+      const a = $('#layout-author'); if (a) a.value = layout.author;
+      KOP_FIELDS.forEach(({ field, id }) => {
+        const el = $('#' + id);
+        if (el && layout.kop[field] != null) el.value = layout.kop[field];
+      });
+      const showEl = $('#kop-inset-show');
+      if (showEl) showEl.checked = layout.kop.insetShow !== false;
+      if (L2.tpl && TEMPLATES[L2.tpl]) layout.tpl = L2.tpl;
+    }
+
+    // Fitur
+    (data.features || []).forEach(sf => {
+      const type = sf.type || inferType(sf.geometry);
+      if (!type) return;
+      const layer = geometryToLayer(sf.geometry, type, sf.category);
+      if (!layer) return;
+      const f = {
+        id: (sf.id != null) ? sf.id : ++idSeq,
+        layer, type,
+        name: sf.name || '',
+        category: CATEGORIES.some(c => c.id === sf.category) ? sf.category : 'lainnya',
+        desc: sf.desc || '',
+        measure: null
+      };
+      drawnItems.addLayer(layer);
+      refreshFeature(f);
+      features.push(f);
+    });
+
+    if (data.seq) idSeq = data.seq;
+
+    // Peta dasar & tampilan
+    if (data.basemap && BASEMAPS[data.basemap]) setBasemap(data.basemap, true);
+
+    renderList();
+    renderCategoryColors();
+    renderCategorySelect();
+    renderLogoPreview();
+
+    // Preset formal perlu dipasang/dilepas sesuai state
+    if (isFormalTpl(layout.tpl)) {
+      if (!document.querySelector('.formal-sheet')) applyTemplate(layout.tpl);
+      else if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
+    } else if (document.querySelector('.formal-sheet')) {
+      applyTemplate(layout.tpl);
+    }
+
+    updateLayout();
+
+    if (data.view) {
+      try { map.setView([data.view.lat, data.view.lng], data.view.zoom, { animate: false }); } catch (e) {}
+    }
+  });
+
+  // Simpan hasil pemulihan tanpa menambah langkah riwayat baru.
+  try {
+    const raw2 = JSON.stringify(buildState());
+    localStorage.setItem(STORE_KEY, raw2);
+    flashSaved();
+  } catch (e) { /* diabaikan */ }
+}
+
+function updateHistoryButtons() {
+  const u = $('#btn-undo'), r = $('#btn-redo');
+  if (u) {
+    const bisa = History.canUndo();
+    u.disabled = !bisa;
+    u.title = bisa ? ('Urungkan: ' + (History.nextUndoLabel() || 'perubahan')) : 'Tidak ada yang bisa diurungkan';
+  }
+  if (r) {
+    const bisa = History.canRedo();
+    r.disabled = !bisa;
+    r.title = bisa ? 'Ulangi perubahan' : 'Tidak ada yang bisa diulangi';
+  }
+}
+
+function doUndo() {
+  const raw = History.undo();
+  if (!raw) { toast('Tidak ada yang bisa diurungkan'); return; }
+  applySnapshot(raw);
+  toast('Diurungkan');
+}
+
+function doRedo() {
+  const raw = History.redo();
+  if (!raw) { toast('Tidak ada yang bisa diulangi'); return; }
+  applySnapshot(raw);
+  toast('Diulangi');
+}
+
+function bindHistory() {
+  const u = $('#btn-undo'), r = $('#btn-redo');
+  if (u) u.addEventListener('click', doUndo);
+  if (r) r.addEventListener('click', doRedo);
+
+  History.onChange = updateHistoryButtons;
+  updateHistoryButtons();
+}
+
 /* -------------------- Inisialisasi -------------------- */
 function init() {
   map = L.map('map', {
@@ -2130,7 +2349,7 @@ function init() {
       if (f) refreshFeature(f);
     });
     renderList();
-    save();
+    save('Ubah bentuk');
     toast('Perubahan bentuk disimpan');
   });
 
@@ -2182,7 +2401,7 @@ function init() {
     f.desc = $('#attr-desc').value.trim();
     refreshFeature(f);
     renderList();
-    save();
+    save('Ubah detail fitur');
     closeAttrModal();
     toast('Detail fitur disimpan');
   });
@@ -2278,12 +2497,21 @@ function init() {
   };
   document.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase();
-    if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+    const diKolomTeks = (tag === 'input' || tag === 'textarea' || tag === 'select');
+
+    // Ctrl/Cmd+Z tetap berlaku walau fokus ada di kolom teks: pengguna
+    // menganggapnya "urungkan perubahan peta", bukan undo ketikan.
+    const kb = (e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+      if (kb === 'z' && !e.shiftKey) { e.preventDefault(); doUndo(); return; }
+      if ((kb === 'z' && e.shiftKey) || kb === 'y') { e.preventDefault(); doRedo(); return; }
+    }
+
+    if (diKolomTeks) {
       if (e.key === 'Escape') e.target.blur();
       return;
     }
-    // jangan ganggu saat modifikasi teks di contenteditable
-    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (e.key === 'Escape') {
       if (currentDrawer) { stopDraw(); toast('Gambar dibatalkan'); }
@@ -2305,6 +2533,9 @@ function init() {
     }
   });
 
+  // ---- Riwayat (undo/redo) ----
+  bindHistory();
+
   // ---- Logo instansi ----
   bindLogoUpload();
 
@@ -2325,6 +2556,15 @@ function init() {
   if (isFormalTpl(layout.tpl)) {
     applyTemplate(layout.tpl);
   }
+
+  // Titik awal riwayat: keadaan dokumen setelah data lama dimuat.
+  try {
+    History.reset(JSON.stringify(buildState()), 'Awal');
+    updateHistoryButtons();
+  } catch (e) { /* diabaikan */ }
+
+  // Tawarkan pemulihan bila cadangan lebih baru dari data utama.
+  cekCadangan();
 
   // ---- Tampilkan bantuan sekali ----
   const params = new URLSearchParams(location.search);

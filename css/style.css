@@ -870,3 +870,16 @@ button, .tool, .tpl-row button, .icon-btn, .feat-item {
     print-color-adjust: exact;
   }
 }
+
+/* ================= TOMBOL UNDO / REDO (header) ================= */
+.icon-top {
+  width: 34px; height: 34px; flex: none;
+  border: 1px solid rgba(255,255,255,.22);
+  background: rgba(255,255,255,.14);
+  color: #fff; border-radius: 9px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s, opacity .15s;
+}
+.icon-top:hover:not(:disabled) { background: rgba(255,255,255,.28); }
+.icon-top:disabled { opacity: .38; cursor: not-allowed; }
+.icon-top:active:not(:disabled) { transform: translateY(1px); }

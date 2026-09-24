@@ -64,7 +64,11 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
 - **Impor GeoJSON** hasil kerja sebelumnya atau dari aplikasi lain (mis. QGIS)
 - **Ramah pengguna & mudah diakses**:
   - **Pintasan keyboard** — `T` titik, `G` garis, `P` poligon, `K` kotak, `B` bulat, `E` edit, `Esc` batal
-  - **Urungkan (undo)** — fitur yang tak sengaja dihapus bisa dipulihkan lewat toast
+  - **Urungkan / Ulangi (undo & redo)** — 40 langkah riwayat untuk **semua**
+  perubahan: bentuk fitur, hapus, warna kategori, teks kop, dan preset.
+  Tombol di header atau `Ctrl+Z` / `Ctrl+Shift+Z` / `Ctrl+Y`
+- **Cadangan otomatis** — salinan terpisah di browser; bila data utama
+  hilang atau rusak, pekerjaan bisa dipulihkan lewat tawaran di layar
   - **Indikator memuat** — bar tipis di atas peta saat tile dimuat
   - **Aksesibilitas** — aria-label di semua tombol ikon, focus trap di modal, skip link,
     dukungan `prefers-reduced-motion`
@@ -98,7 +102,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (57 test)
+# Jalankan test (63 test)
 npm test
 ```
 
@@ -147,6 +151,7 @@ Tidak ada backend, tidak ada database, tidak ada pelacakan.
 │   └── print-layout.css    # Aturan cetak / PDF
 ├── js/
 │   ├── app.js              # Logika utama aplikasi
+│   ├── history.js          # Riwayat undo/redo + cadangan otomatis
 │   ├── admin-boundaries.js # Batas administrasi (Nominatim, tanpa API key)
 │   ├── formal-layout.js    # Graticule, skala batang, format DMS
 │   ├── formal-sheet.js     # Lembar 2 kolom, inset, legenda otomatis

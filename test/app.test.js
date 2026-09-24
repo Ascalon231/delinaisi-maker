@@ -2088,3 +2088,217 @@ test('CSV: tabel atribut untuk lampiran laporan', async ({ page }) => {
   expect(lines[1]).toMatch(/\d+,\d+/);
   expect(lines[1]).toContain('-6,920000');
 });
+
+/* ============================================================
+   Undo / Redo & cadangan otomatis
+   ============================================================ */
+
+test('undo/redo: mengembalikan bentuk fitur secara persis', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1400);
+
+  await page.evaluate(() => {
+    const l = L.polygon([[-6.90,107.58],[-6.90,107.62],[-6.94,107.62],[-6.94,107.58]]);
+    addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: 'Kawasan',
+                 category: 'batas_admin', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(900);
+  const luasAwal = await page.evaluate(() => Math.round(features[0].measure.area));
+
+  // Geser bentuk seperti saat user menarik sudut
+  await page.evaluate(() => {
+    const f = features[0];
+    f.layer.setLatLngs([[-6.85,107.50],[-6.85,107.70],[-6.99,107.70],[-6.99,107.50]]);
+    refreshFeature(f); renderList(); save('Ubah bentuk');
+  });
+  await page.waitForTimeout(1000);
+  const luasGeser = await page.evaluate(() => Math.round(features[0].measure.area));
+  expect(luasGeser).not.toBe(luasAwal);
+
+  // Undo -> luas & bentuk kembali persis
+  await page.locator('#btn-undo').click();
+  await page.waitForTimeout(1100);
+  const luasUndo = await page.evaluate(() => Math.round(features[0].measure.area));
+  expect(luasUndo).toBe(luasAwal);
+
+  // Redo -> kembali ke bentuk yang digeser
+  await page.locator('#btn-redo').click();
+  await page.waitForTimeout(1100);
+  expect(await page.evaluate(() => Math.round(features[0].measure.area))).toBe(luasGeser);
+});
+
+test('undo/redo: tombol aktif-nonaktif & shortcut keyboard', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1400);
+
+  // Awalnya keduanya nonaktif
+  await expect(page.locator('#btn-undo')).toBeDisabled();
+  await expect(page.locator('#btn-redo')).toBeDisabled();
+
+  await seedThreeCategories(page);
+  await page.waitForTimeout(900);
+  await expect(page.locator('#btn-undo')).toBeEnabled();
+  await expect(page.locator('#btn-redo')).toBeDisabled();
+
+  // Ctrl+Z
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(900);
+  await expect(page.locator('#feat-count')).toHaveText('2');
+  await expect(page.locator('#btn-redo')).toBeEnabled();
+
+  // Ctrl+Shift+Z
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(900);
+  await expect(page.locator('#feat-count')).toHaveText('3');
+
+  // Ctrl+Y juga berfungsi untuk redo
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(900);
+  await expect(page.locator('#feat-count')).toHaveText('2');
+  await page.keyboard.press('Control+y');
+  await page.waitForTimeout(900);
+  await expect(page.locator('#feat-count')).toHaveText('3');
+
+  // Undo sampai habis -> tombol undo nonaktif lagi
+  while (await page.evaluate(() => History.canUndo())) {
+    await page.locator('#btn-undo').click();
+    await page.waitForTimeout(450);
+  }
+  await expect(page.locator('#btn-undo')).toBeDisabled();
+  await expect(page.locator('#feat-count')).toHaveText('0');
+});
+
+test('undo: berlaku untuk hapus, warna kategori, dan teks kop', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1400);
+
+  await seedThreeCategories(page);
+  await page.waitForTimeout(900);
+
+  // 1. Hapus fitur -> undo
+  await page.evaluate(() => deleteFeature(features[0].id));
+  await page.waitForTimeout(900);
+  await expect(page.locator('#feat-count')).toHaveText('2');
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1000);
+  await expect(page.locator('#feat-count')).toHaveText('3');
+
+  // 2. Ubah warna kategori -> undo
+  await page.evaluate(() => {
+    setCategoryColor('batas_admin', '#00ff00');
+    features.forEach(f => applyStyle(f));
+    renderList();
+    save('Ubah warna');
+  });
+  await page.waitForTimeout(900);
+  expect(await page.evaluate(() => catOf('batas_admin').color)).toBe('#00ff00');
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1100);
+  expect(await page.evaluate(() => catOf('batas_admin').color)).toBe('#e63946');
+
+  // 3. Ubah teks kop di lembar formal -> undo (input ikut tersinkron)
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+  await page.locator('#kop-programStudy').fill('Perencanaan Wilayah dan Kota');
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => layout.kop.programStudy)).toBe('Perencanaan Wilayah dan Kota');
+
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1200);
+  expect(await page.evaluate(() => layout.kop.programStudy)).toBe('');
+  await expect(page.locator('#kop-programStudy')).toHaveValue('');
+  // Lembar formal tidak boleh lepas akibat undo
+  await expect(page.locator('.formal-sheet')).toHaveCount(1);
+});
+
+test('cadangan: salinan otomatis tersimpan & bisa dibaca', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1400);
+
+  await seedThreeCategories(page);
+  await page.waitForTimeout(900);
+
+  // Cadangan dijadwalkan dengan penundaan; tunggu sampai tertulis
+  await expect
+    .poll(async () => page.evaluate(() => {
+      const c = Backup.read();
+      if (!c) return 0;
+      try { return JSON.parse(c.raw).features.length; } catch (e) { return -1; }
+    }), { timeout: 8000, message: 'cadangan tidak terbentuk' })
+    .toBe(3);
+
+  // Cadangan berisi state lengkap, bukan hanya fitur
+  const isi = await page.evaluate(() => {
+    const d = JSON.parse(Backup.read().raw);
+    return { layout: !!d.layout, categories: Array.isArray(d.categories),
+             kop: !!(d.layout && d.layout.kop) };
+  });
+  expect(isi.layout).toBe(true);
+  expect(isi.categories).toBe(true);
+  expect(isi.kop).toBe(true);
+});
+
+test('undo: berlaku berurutan & tetap jalan saat fokus di kolom teks', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1400);
+
+  await page.evaluate(() => {
+    const l = L.polygon([[-6.90,107.58],[-6.90,107.62],[-6.94,107.62],[-6.94,107.58]]);
+    addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: 'A',
+                 category: 'batas_admin', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(900);
+
+  // Ketik judul (menambah satu langkah riwayat)
+  await page.locator('#layout-title').click();
+  await page.locator('#layout-title').fill('Judul Baru');
+  await page.waitForTimeout(900);
+  expect(await page.evaluate(() => layout.title)).toBe('Judul Baru');
+
+  // Ctrl+Z #1 -> mengurungkan perubahan judul (perubahan terakhir)
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => layout.title)).toBe('');
+  expect(await page.evaluate(() => features.length)).toBe(1);
+
+  // Ctrl+Z #2 -> baru mengurungkan penambahan fitur
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => features.length)).toBe(0);
+
+  // Redo mengembalikan keduanya secara berurutan
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(900);
+  expect(await page.evaluate(() => features.length)).toBe(1);
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(900);
+  expect(await page.evaluate(() => layout.title)).toBe('Judul Baru');
+});
+
+test('shortcut: tombol huruf tidak mengganggu saat mengetik di kolom teks', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1400);
+
+  // Mengetik "peta" di kolom judul tidak boleh mengaktifkan alat gambar
+  await page.locator('#layout-title').click();
+  await page.locator('#layout-title').type('peta', { delay: 60 });
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() =>
+    document.querySelector('.tool[data-tool="Polygon"]').classList.contains('active'))).toBe(false);
+  await expect(page.locator('#layout-title')).toHaveValue('peta');
+
+  // Di luar kolom teks, shortcut tetap berfungsi
+  await page.locator('#map').click({ position: { x: 700, y: 400 } });
+  await page.keyboard.press('p');
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() =>
+    document.querySelector('.tool[data-tool="Polygon"]').classList.contains('active'))).toBe(true);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(300);
+});
