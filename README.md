@@ -28,7 +28,8 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   - **Skala batang** bergaya peta cetak (kotak hitam-putih berselang) + skala
     numerik `1:xxx.xxx`, plus ikon mata angin
   - **Diagram lokasi** (inset map): peta Leaflet kedua yang zoom-out, dengan
-    **kotak merah** yang mengikuti `getBounds()` peta utama secara real-time
+    **kotak merah** yang mengikuti `getBounds()` peta utama secara real-time,
+    plus grid koordinatnya sendiri
   - **Legenda otomatis** dari kategori unik yang dipakai fitur — lengkap dengan
     **color picker per kategori** agar warna konsisten di peta & legenda
   - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
@@ -66,7 +67,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (19 test)
+# Jalankan test (21 test)
 npm test
 ```
 

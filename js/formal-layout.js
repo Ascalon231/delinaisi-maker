@@ -82,7 +82,11 @@ const FormalLayout = (function () {
   function drawGraticule(ctx, map, size, opts) {
     opts = opts || {};
     const margin = opts.margin != null ? opts.margin : 0;
-    const step = intervalFor(map.getZoom());
+    // Langkah bisa dipaksa (dipakai inset yang perlu grid lebih jarang),
+    // atau dihitung dari zoom peta.
+    const step = opts.step != null ? opts.step : intervalFor(map.getZoom());
+    const fontSize = opts.fontSize || 10;
+    const showEdgeLabels = opts.showEdgeLabels !== false;
 
     // Area peta di dalam margin frame
     const x0 = margin, y0 = margin;
@@ -96,7 +100,7 @@ const FormalLayout = (function () {
     const lngLeft = nw.lng, lngRight = se.lng;
 
     ctx.save();
-    ctx.font = '10px -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = fontSize + 'px -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 1;
     ctx.strokeStyle = opts.color || 'rgba(20,20,20,.55)';
@@ -115,12 +119,13 @@ const FormalLayout = (function () {
       ctx.stroke();
 
       const label = toDMS(lat, true);
-      ctx.textAlign = 'left';
-      // Label di sisi KIRI (di margin) dan KANAN (di margin)
-      ctx.fillText(label, margin > 16 ? 2 : x0 + 3, y);
-      const w = ctx.measureText(label).width;
-      ctx.textAlign = 'right';
-      ctx.fillText(label, size.x - (margin > 16 ? 2 : 3), y);
+      if (showEdgeLabels) {
+        ctx.textAlign = 'left';
+        // Label di sisi KIRI (di margin) dan KANAN (di margin)
+        ctx.fillText(label, margin > 16 ? 2 : x0 + 3, y);
+        ctx.textAlign = 'right';
+        ctx.fillText(label, size.x - (margin > 16 ? 2 : 3), y);
+      }
     }
 
     // --- Garis bujur (vertikal) ---
@@ -136,11 +141,12 @@ const FormalLayout = (function () {
       ctx.stroke();
 
       const label = toDMS(lng, false);
-      const w = ctx.measureText(label).width;
-      ctx.textAlign = 'center';
-      // Label di sisi ATAS dan BAWAH (di margin)
-      ctx.fillText(label, x, margin > 16 ? 8 : y0 + 10);
-      ctx.fillText(label, x, size.y - (margin > 16 ? 8 : 10));
+      if (showEdgeLabels) {
+        ctx.textAlign = 'center';
+        // Label di sisi ATAS dan BAWAH (di margin)
+        ctx.fillText(label, x, margin > 16 ? 8 : y0 + 10);
+        ctx.fillText(label, x, size.y - (margin > 16 ? 8 : 10));
+      }
     }
 
     ctx.restore();

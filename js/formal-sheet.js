@@ -123,8 +123,11 @@ const FormalSheet = (function () {
     const insetWrap = el('div', 'fl-inset-wrap');
     const insetDiv = el('div', 'fl-inset-map');
     insetDiv.id = 'fl-inset-map';
+    const insetGrat = el('canvas', 'fl-inset-graticule');
+    insetGrat.id = 'fl-inset-graticule';
     const insetAttr = el('div', 'fl-inset-attr', INSET_ATTRIB);
     insetWrap.appendChild(insetDiv);
+    insetWrap.appendChild(insetGrat);
     insetWrap.appendChild(insetAttr);
     bInset.appendChild(insetHead);
     bInset.appendChild(insetWrap);
@@ -319,6 +322,9 @@ const FormalSheet = (function () {
 
     insetReady = true;
     syncInset();
+    // Kanvas baru punya ukuran setelah layout selesai; gambar ulang setelahnya.
+    requestAnimationFrame(refreshInsetGraticule);
+    setTimeout(refreshInsetGraticule, 120);
   }
 
   // Sinkronkan inset dengan peta utama: kotak merah = getBounds() peta utama.
@@ -331,7 +337,45 @@ const FormalSheet = (function () {
       // Area kajian selalu terlihat, tapi inset tetap lebih luas dari peta utama.
       const zoomOut = Math.max(2, Math.min(map.getZoom() - 4, 9));
       insetMap.setView(b.getCenter(), zoomOut, { animate: false });
+      // Grid inset ikut berubah saat cakupan berubah.
+      refreshInsetGraticule();
     } catch (e) { /* diabaikan */ }
+  }
+
+  /* -------------------- Graticule inset -------------------- */
+  // Inset juga diberi grid koordinat (spesifikasi: "plus grid koordinat"),
+  // dengan langkah lebih jarang dan label ringkas karena area lebih luas.
+  function refreshInsetGraticule() {
+    const cvs = document.getElementById('fl-inset-graticule');
+    if (!cvs || !insetReady || !insetMap) return;
+
+    const wrap = cvs.parentNode;
+    if (!wrap) return;
+    const w = wrap.clientWidth || 0;
+    const h = wrap.clientHeight || 0;
+    if (!w || !h) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    cvs.width = Math.round(w * dpr);
+    cvs.height = Math.round(h * dpr);
+    cvs.style.width = w + 'px';
+    cvs.style.height = h + 'px';
+
+    const ctx = cvs.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    // Grid inset dibuat lebih jarang dari peta utama, dan tanpa label tepi
+    // supaya tidak berdesakan di kotak kecil.
+    // Jaga agar grid inset tetap informatif: jangan lebih jarang dari 10
+    // derajat, dan jangan lebih rapat dari 1 derajat.
+    const step = Math.min(Math.max(FormalLayout.intervalFor(insetMap.getZoom()), 1), 10);
+    FormalLayout.drawGraticule(ctx, insetMap, { x: w, y: h }, {
+      step: step,
+      fontSize: 8,
+      showEdgeLabels: false,
+      color: 'rgba(30,30,30,.35)'
+    });
   }
 
   /* -------------------- Legenda otomatis -------------------- */
@@ -432,6 +476,17 @@ const FormalSheet = (function () {
       if (map && !map.__formalBound) {
         map.__formalBound = true;
         map.on('move zoom moveend zoomend resize', scheduleRefresh);
+        // Perubahan ukuran jendela tidak selalu memicu event Leaflet,
+        // jadi diikat juga ke window (debounce lewat scheduleRefresh).
+        window.addEventListener('resize', scheduleRefresh);
+        // Ukuran panel berubah (mis. scrollbar) -> segarkan skala batang.
+        if (typeof ResizeObserver !== 'undefined' && !window.__formalRO) {
+          const wrapEl = document.getElementById('map-wrap');
+          if (wrapEl) {
+            window.__formalRO = new ResizeObserver(scheduleRefresh);
+            window.__formalRO.observe(wrapEl);
+          }
+        }
       }
       scheduleRefresh();
       // Peta butuh ukuran final sebelum digambar.
@@ -440,12 +495,30 @@ const FormalSheet = (function () {
     },
 
     deactivate: function () {
+      // Lepas listener jendela supaya tidak menumpuk saat preset berganti-ganti.
+      window.removeEventListener('resize', scheduleRefresh);
+      if (window.__formalRO) {
+        try { window.__formalRO.disconnect(); } catch (e) {}
+        window.__formalRO = null;
+      }
+      if (map && map.__formalBound) {
+        map.off('move zoom moveend zoomend resize', scheduleRefresh);
+        map.__formalBound = false;
+      }
       uninstallMap();
       const s = document.querySelector('.formal-sheet');
       if (s && s.parentNode) s.parentNode.removeChild(s);
       built = false;
       sheet = null;
       mapHost = null;
+      // DOM lembar dibuang, jadi instance inset ikut mati. Reset penandanya
+      // supaya initInset() membangun ulang saat preset diaktifkan lagi.
+      if (insetMap) {
+        try { insetMap.remove(); } catch (e) { /* diabaikan */ }
+      }
+      insetMap = null;
+      insetBox = null;
+      insetReady = false;
     },
 
     // Dipanggil setelah data fitur berubah (tambah/hapus/edit/ATUR WARNA).

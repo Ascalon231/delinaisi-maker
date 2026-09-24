@@ -563,3 +563,80 @@ test('kop akademik: teks generik (tanpa topik hardcode) & ekspor tetap tersedia'
   // Preset lain tidak terpengaruh: 5 tombol preset ada
   await expect(page.locator('#tpl-row button')).toHaveCount(5);
 });
+
+test('kop akademik: inset punya grid koordinat & bertahan saat preset ditukar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+
+  // Kanvas grid inset ada, berukuran, dan benar-benar tergambar (ada piksel).
+  const ink = () => page.evaluate(() => {
+    const c = document.querySelector('#fl-inset-graticule');
+    if (!c || !c.width) return null;
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let k = 3; k < d.length; k += 4) if (d[k] > 0) n++;
+    return n;
+  });
+  expect(await ink()).toBeGreaterThan(0);
+
+  // Tukar preset bolak-balik: inset harus dibangun ulang, bukan hilang.
+  for (let i = 0; i < 3; i++) {
+    await page.locator('[data-tpl="klasik"]').click();
+    await page.waitForTimeout(350);
+    await page.locator('[data-tpl="formal"]').click();
+    await page.waitForTimeout(800);
+  }
+  await page.waitForTimeout(700);
+
+  await expect(page.locator('.formal-sheet')).toHaveCount(1);
+  // Hanya ada SATU peta utama, dan ia berada di dalam lembar formal
+  // (bukan lagi anak langsung #map-wrap).
+  await expect(page.locator('#map')).toHaveCount(1);
+  await expect(page.locator('.formal-sheet #map')).toHaveCount(1);
+  await expect(page.locator('#map-wrap > #map')).toHaveCount(0);
+  await expect(page.locator('#fl-inset-map.leaflet-container')).toHaveCount(1);
+  expect(await ink()).toBeGreaterThan(0);
+});
+
+test('kop akademik: tahan resize berulang tanpa error & tetap konsisten', async ({ page }) => {
+  const errs = [];
+  page.on('pageerror', (e) => errs.push(e.message));
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1500);
+
+  for (const w of [1200, 1000, 1380, 900, 1500]) {
+    await page.setViewportSize({ width: w, height: 850 });
+    await page.waitForTimeout(320);
+  }
+  await page.waitForTimeout(700);
+
+  // Kanvas menyesuaikan ukuran & tidak ada listener yang menumpuk jadi error.
+  const state = await page.evaluate(() => {
+    const m = document.querySelector('#fl-graticule');
+    const i = document.querySelector('#fl-inset-graticule');
+    return {
+      mainW: m.width,
+      frameW: document.querySelector('.fl-map-frame').clientWidth,
+      insetW: i.width,
+      insetWrapW: document.querySelector('.fl-inset-wrap').clientWidth,
+      legend: document.querySelectorAll('#fl-legend .fl-legend-item').length,
+      sheets: document.querySelectorAll('.formal-sheet').length
+    };
+  });
+  expect(state.sheets).toBe(1);
+  expect(state.legend).toBe(3);
+  expect(state.mainW).toBeGreaterThan(state.frameW - 40);
+  expect(state.insetW).toBeGreaterThan(state.insetWrapW - 40);
+  expect(errs).toEqual([]);
+});

@@ -164,6 +164,12 @@
   max-width: 100%;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* Grid koordinat pada inset */
+.fl-inset-graticule {
+  position: absolute; inset: 0; z-index: 450;
+  pointer-events: none;
+}
+
 /* Kotak merah cakupan peta utama */
 .fl-inset-box {
   stroke: #e01b1b; stroke-width: 1.8; fill: rgba(224,27,27,.10);
