@@ -386,12 +386,12 @@ test('kop akademik: legenda otomatis dari 3 kategori + warna kustom', async ({ p
   });
   expect(swatchColor).toBe('rgb(42, 157, 143)'); // #2a9d8f bawaan
 
-  // Ubah warna lewat color picker -> legenda ikut berubah & tersimpan
-  await page.evaluate(() => {
-    const inp = document.querySelector('#cat-color-list input[data-cat="wilayah_studi"]');
-    inp.value = '#ff00aa';
-    inp.dispatchEvent(new Event('input', { bubbles: true }));
-  });
+  // Ubah warna lewat pengelola warna -> legenda ikut berubah & tersimpan.
+  // Buka panel warna kategori "Wilayah Studi", lalu isi HEX manual.
+  await page.locator('.cat-row[data-cat="wilayah_studi"] .cat-swatch').click();
+  await page.waitForTimeout(300);
+  await page.locator('.cat-row[data-cat="wilayah_studi"] .cat-hex').fill('#ff00aa');
+  await page.locator('.cat-row[data-cat="wilayah_studi"] .cat-hex').blur();
   await page.waitForTimeout(500);
 
   const newColor = await page.evaluate(() => {
@@ -639,4 +639,190 @@ test('kop akademik: tahan resize berulang tanpa error & tetap konsisten', async 
   expect(state.mainW).toBeGreaterThan(state.frameW - 40);
   expect(state.insetW).toBeGreaterThan(state.insetWrapW - 40);
   expect(errs).toEqual([]);
+});
+
+/* ============================================================
+   Pengelola warna kategori
+   ============================================================ */
+
+test('warna kategori: palet, HEX manual, dan preview', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Buka panel warna kategori pertama
+  await page.locator('.cat-row').first().locator('.cat-swatch').click();
+  await page.waitForTimeout(300);
+
+  // Panel berisi preview, palet bergrup, dan input HEX
+  await expect(page.locator('.cat-preview')).toHaveCount(1);
+  await expect(page.locator('.cat-palette-group')).toHaveCount(6);
+  expect(await page.locator('.cat-palette-dot').count()).toBeGreaterThanOrEqual(40);
+  await expect(page.locator('.cat-hex')).toHaveValue('#e63946');
+
+  // Pilih dari palet -> HEX & swatch ikut berubah
+  await page.locator('.cat-palette-dot').nth(9).click();
+  await page.waitForTimeout(400);
+  const afterPalette = await page.locator('.cat-hex').inputValue();
+  expect(afterPalette).toMatch(/^#[0-9a-f]{6}$/);
+  const swatchBg = await page.locator('.cat-row').first().locator('.cat-swatch')
+    .evaluate(e => getComputedStyle(e).backgroundColor);
+  expect(swatchBg).not.toBe('rgb(230, 57, 70)');
+
+  // HEX manual (dengan/tanpa '#') diterima & dinormalisasi
+  await page.locator('.cat-hex').fill('1B998B');
+  await page.locator('.cat-hex').blur();
+  await page.waitForTimeout(400);
+  await expect(page.locator('.cat-hex')).toHaveValue('#1b998b');
+
+  // HEX tidak valid ditolak, nilai lama dipertahankan
+  await page.locator('.cat-hex').fill('bukan-warna');
+  await page.locator('.cat-hex').blur();
+  await page.waitForTimeout(400);
+  await expect(page.locator('.cat-hex')).toHaveValue('#1b998b');
+
+  // Tersimpan
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('delinaisi-maker-v1')).catColors.batas_admin);
+  expect(stored).toBe('#1b998b');
+});
+
+test('warna kategori: ganti nama ikut ke dropdown & legenda', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await seedThreeCategories(page);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1300);
+
+  // Ganti nama kategori yang sedang dipakai
+  const nameInput = page.locator('.cat-row[data-cat="wilayah_studi"] .cat-name-input');
+  await nameInput.fill('Zona Industri');
+  await nameInput.blur();
+  await page.waitForTimeout(700);
+
+  // Nama baru muncul di legenda lembar formal
+  const labels = await page.locator('#fl-legend .fl-legend-label').allTextContents();
+  expect(labels).toContain('Zona Industri');
+  expect(labels).not.toContain('Wilayah Studi');
+
+  // Dan di dropdown modal detail fitur
+  await page.locator('.feat').first().locator('.icon-btn[data-act="edit"]').click();
+  await page.waitForTimeout(500);
+  const opts = await page.locator('#attr-category option').allTextContents();
+  expect(opts).toContain('Zona Industri');
+  await page.locator('#attr-cancel').click();
+});
+
+test('warna kategori: tambah, hapus, dan peringatan warna kembar', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  const before = await page.locator('.cat-row').count();
+  expect(before).toBe(7);
+
+  // Tambah kategori baru -> otomatis dapat warna yang belum terpakai
+  await page.locator('#btn-cat-add').click();
+  await page.waitForTimeout(500);
+  expect(await page.locator('.cat-row').count()).toBe(before + 1);
+
+  const newRow = page.locator('.cat-row').last();
+  const newColor = await newRow.locator('.cat-swatch')
+    .evaluate(e => getComputedStyle(e).backgroundColor);
+
+  // Paksa warna sama dengan kategori lain -> muncul peringatan.
+  // Kategori baru sudah otomatis membuka panelnya, jadi jangan klik dua kali.
+  if (!(await newRow.evaluate(e => e.classList.contains('open')))) {
+    await newRow.locator('.cat-swatch').click();
+    await page.waitForTimeout(300);
+  }
+  await newRow.locator('.cat-hex').fill('#e63946');
+  await newRow.locator('.cat-hex').blur();
+  await page.waitForTimeout(500);
+
+  await expect(page.locator('#cat-dupe-warn')).toBeVisible();
+  await expect(page.locator('#cat-dupe-warn')).toContainText('Warna sama');
+  expect(await page.locator('.cat-swatch-warn').count()).toBeGreaterThanOrEqual(2);
+
+  // Kategori yang belum dipakai bisa dihapus
+  await newRow.locator('.cat-del').click();
+  await page.waitForTimeout(500);
+  expect(await page.locator('.cat-row').count()).toBe(before);
+
+  // Kategori yang sedang dipakai tidak bisa dihapus
+  await page.evaluate(() => {
+    const l = L.polygon([[-6.9,107.58],[-6.9,107.62],[-6.93,107.62],[-6.93,107.58]]);
+    addFeature({ id: ++idSeq, layer: l, type: 'Polygon', name: 'A',
+                 category: 'batas_admin', desc: '', measure: null }, false);
+  });
+  await page.waitForTimeout(700);
+  await expect(page.locator('.cat-row[data-cat="batas_admin"] .cat-del')).toBeDisabled();
+  await expect(page.locator('.cat-row[data-cat="batas_admin"] .cat-count')).toHaveText('1 fitur');
+});
+
+test('warna kategori: kategori kustom bertahan setelah reload', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Tambah kategori + beri nama & warna
+  await page.locator('#btn-cat-add').click();
+  await page.waitForTimeout(400);
+  const row = page.locator('.cat-row').last();
+  await row.locator('.cat-name-input').fill('Kawasan Hutan');
+  await row.locator('.cat-name-input').blur();
+  await page.waitForTimeout(300);
+  if (!(await row.evaluate(e => e.classList.contains('open')))) {
+    await row.locator('.cat-swatch').click();
+    await page.waitForTimeout(300);
+  }
+  await row.locator('.cat-hex').fill('#2d6a4f');
+  await row.locator('.cat-hex').blur();
+  await page.waitForTimeout(600);
+
+  const stored = await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1'));
+  const parsed = JSON.parse(stored);
+  expect(parsed.categories.some(c => c.label === 'Kawasan Hutan' && c.color === '#2d6a4f')).toBe(true);
+
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d), stored);
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  expect(await page.locator('.cat-row').count()).toBe(8);
+  const names = await page.locator('.cat-name-input').evaluateAll(els => els.map(e => e.value));
+  expect(names).toContain('Kawasan Hutan');
+  const colors = await page.locator('.cat-swatch').evaluateAll(
+    els => els.map(e => getComputedStyle(e).backgroundColor));
+  expect(colors).toContain('rgb(45, 106, 79)');
+});
+
+test('warna kategori: reset memulihkan bawaan tapi kategori kustom tetap ada', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Ubah warna bawaan + tambah kategori kustom
+  await page.locator('.cat-row[data-cat="batas_admin"] .cat-swatch').click();
+  await page.waitForTimeout(300);
+  await page.locator('.cat-row[data-cat="batas_admin"] .cat-hex').fill('#123456');
+  await page.locator('.cat-row[data-cat="batas_admin"] .cat-hex').blur();
+  await page.waitForTimeout(400);
+  await page.locator('#btn-cat-add').click();
+  await page.waitForTimeout(400);
+
+  // Reset
+  await page.locator('#btn-cat-reset').click();
+  await page.waitForTimeout(600);
+
+  const state = await page.evaluate(() => ({
+    warnaBawaan: CATEGORIES.find(c => c.id === 'batas_admin').color,
+    jumlah: CATEGORIES.length,
+    masihAdaKustom: CATEGORIES.some(c => c.id.startsWith('kustom_'))
+  }));
+  expect(state.warnaBawaan).toBe('#e63946');
+  expect(state.masihAdaKustom).toBe(true);
+  expect(state.jumlah).toBe(8);
 });

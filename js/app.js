@@ -19,12 +19,61 @@ const DEFAULT_CATEGORIES = [
   { id: 'lainnya',          label: 'Lainnya',                 color: '#6c757d' }
 ];
 
-// Salinan yang bisa diubah user (warna kustom per kategori) — disimpan di localStorage.
+// Palet siap pakai supaya user tidak perlu memilih warna dari nol.
+// Dikelompokkan agar mudah dipindai; semuanya kontras di atas basemap terang.
+const PALETTE = [
+  { name: 'Merah & Hangat', colors: ['#e63946', '#d62828', '#e76f51', '#f4a261', '#e9c46a', '#bc4749', '#c1121f', '#ff6b35'] },
+  { name: 'Hijau & Alam',   colors: ['#588157', '#2a9d8f', '#3a5a40', '#40916c', '#74c69d', '#a3b18a', '#1b4332', '#95d5b2'] },
+  { name: 'Biru & Air',     colors: ['#457b9d', '#0096c7', '#1d3557', '#2f6fed', '#48cae4', '#0077b6', '#90e0ef', '#023e8a'] },
+  { name: 'Ungu & Magenta', colors: ['#7b2cbf', '#9d4edd', '#c77dff', '#b5179e', '#7209b7', '#f72585', '#560bad', '#e0aaff'] },
+  { name: 'Netral & Gelap', colors: ['#6c757d', '#495057', '#343a40', '#adb5bd', '#212529', '#8d99ae', '#2b2d42', '#ced4da'] },
+  { name: 'Tanah & Panas',  colors: ['#a47148', '#8b5e34', '#bb9457', '#6f4e37', '#d4a373', '#9c6644', '#7f5539', '#ccd5ae'] }
+];
+
+// Salinan yang bisa diubah user (warna + nama kategori) — disimpan di localStorage.
 let CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
 
 function setCategoryColor(id, color) {
   const c = CATEGORIES.find(x => x.id === id);
   if (c) c.color = color;
+}
+
+// Normalisasi HEX agar input user fleksibel (#abc, abc, #AABBCC).
+function normalizeHex(v) {
+  if (!v) return null;
+  let t = String(v).trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{3}$/.test(t)) {
+    t = t[0] + t[0] + t[1] + t[1] + t[2] + t[2];
+  }
+  if (!/^[0-9a-fA-F]{6}$/.test(t)) return null;
+  return '#' + t.toLowerCase();
+}
+
+// Hitung luminance relatif untuk memilih warna teks yang kontras.
+function hexLuminance(hex) {
+  const h = normalizeHex(hex) || '#000000';
+  const r = parseInt(h.slice(1, 3), 16) / 255;
+  const g = parseInt(h.slice(3, 5), 16) / 255;
+  const b = parseInt(h.slice(5, 7), 16) / 255;
+  const f = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
+// Warna yang mirip membuat legenda sulit dibaca -> deteksi untuk diperingatkan.
+function similarColorGroups() {
+  const byColor = {};
+  CATEGORIES.forEach(c => {
+    const key = normalizeHex(c.color) || c.color;
+    (byColor[key] = byColor[key] || []).push(c);
+  });
+  return Object.keys(byColor).map(k => byColor[k]).filter(g => g.length > 1);
+}
+
+// ID unik untuk kategori baru.
+function newCategoryId() {
+  let n = 1;
+  while (CATEGORIES.some(c => c.id === 'kustom_' + n)) n++;
+  return 'kustom_' + n;
 }
 
 const TYPE_LABEL = {
@@ -273,6 +322,8 @@ function renderList() {
   $('#feat-count').textContent = features.length;
   $('#feat-empty').style.display = features.length ? 'none' : '';
   updateLegend();
+  // Hitungan "n fitur" dan tombol hapus di panel warna ikut berubah.
+  if (typeof renderCategoryColors === 'function') renderCategoryColors();
   // Legenda lembar formal dibangun dari kategori unik -> ikut diperbarui.
   if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
 
@@ -463,15 +514,11 @@ function openAttrModal(id, isNew) {
   if (!f) return;
   editingFeatureId = id;
 
+  renderCategorySelect();
   const sel = $('#attr-category');
-  if (sel.options.length === 0) {
-    CATEGORIES.forEach(c => {
-      const o = document.createElement('option');
-      o.value = c.id; o.textContent = c.label;
-      sel.appendChild(o);
-    });
-  }
-  sel.value = CATEGORIES.some(c => c.id === f.category) ? f.category : 'lainnya';
+  sel.value = CATEGORIES.some(c => c.id === f.category)
+    ? f.category
+    : (CATEGORIES[CATEGORIES.length - 1] || {}).id;
 
   $('#attr-name').value = f.name || '';
   $('#attr-desc').value = f.desc || '';
@@ -728,9 +775,11 @@ function bindLayout() {
     save();
   });
 
-  // Tombol reset warna kategori
+  // Tombol warna kategori
   const resetBtn = $('#btn-cat-reset');
   if (resetBtn) resetBtn.addEventListener('click', resetCategoryColors);
+  const addBtn = $('#btn-cat-add');
+  if (addBtn) addBtn.addEventListener('click', addCategory);
 
   // Kop Akademik fields
   KOP_FIELDS.forEach(field => {
@@ -765,42 +814,276 @@ function bindLayout() {
   });
 }
 
-/* -------------------- Warna kategori (color picker) -------------------- */
+/* -------------------- Warna kategori (pengelola warna) -------------------- */
 // Legenda formal di-generate dari kategori unik yang dipakai fitur, dengan
-// warna ini. Warna tersimpan di localStorage bersama data lain.
+// warna ini. Kategori bisa ditambah, diganti nama, diwarnai, dan dihapus —
+// semuanya tersimpan di localStorage bersama data lain.
+
+let activeSwatchId = null;   // kategori yang panel warnanya sedang terbuka
+
+function categoryUsage() {
+  const used = {};
+  features.forEach(f => { used[f.category] = (used[f.category] || 0) + 1; });
+  return used;
+}
+
+// Terapkan warna ke peta + segarkan semua tampilan turunannya.
+function applyCategoryChange(catId) {
+  features.forEach(f => { if (f.category === catId) applyStyle(f); });
+  renderList();
+  renderCategoryColors();
+  if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
+  save();
+}
+
 function renderCategoryColors() {
   const host = $('#cat-color-list');
   if (!host) return;
   host.innerHTML = '';
+
+  const usage = categoryUsage();
+  const dupes = similarColorGroups();
+  const dupeIds = new Set();
+  dupes.forEach(g => g.forEach(c => dupeIds.add(c.id)));
+
   CATEGORIES.forEach(cat => {
-    const row = document.createElement('label');
-    row.className = 'cat-color-item';
+    const row = document.createElement('div');
+    row.className = 'cat-row';
     row.dataset.cat = cat.id;
-    row.innerHTML =
-      '<span class="cat-color-name">' + esc(cat.label) + '</span>' +
-      '<input type="color" value="' + esc(cat.color) + '" ' +
-        'aria-label="Warna untuk ' + esc(cat.label) + '" data-cat="' + esc(cat.id) + '">';
-    const input = row.querySelector('input');
-    input.addEventListener('input', (e) => {
-      setCategoryColor(cat.id, e.target.value);
-      // Terapkan ulang ke semua fitur kategori ini.
-      features.forEach(f => { if (f.category === cat.id) applyStyle(f); });
-      renderList();
-      if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
-      save();
+    if (activeSwatchId === cat.id) row.classList.add('open');
+
+    const n = usage[cat.id] || 0;
+    const lum = hexLuminance(cat.color);
+    const checkColor = lum > 0.5 ? '#1a2332' : '#ffffff';
+
+    /* ---- Baris utama: swatch + nama + jumlah fitur ---- */
+    const head = document.createElement('div');
+    head.className = 'cat-row-head';
+
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = 'cat-swatch';
+    swatch.style.background = cat.color;
+    swatch.title = 'Ubah warna';
+    swatch.setAttribute('aria-label', 'Ubah warna ' + cat.label);
+    swatch.setAttribute('aria-expanded', activeSwatchId === cat.id ? 'true' : 'false');
+    if (dupeIds.has(cat.id)) {
+      const warn = document.createElement('span');
+      warn.className = 'cat-swatch-warn';
+      warn.textContent = '!';
+      warn.title = 'Warna sama dengan kategori lain';
+      swatch.appendChild(warn);
+    }
+    swatch.addEventListener('click', () => {
+      activeSwatchId = (activeSwatchId === cat.id) ? null : cat.id;
+      renderCategoryColors();
     });
+
+    const name = document.createElement('input');
+    name.type = 'text';
+    name.className = 'cat-name-input';
+    name.value = cat.label;
+    name.maxLength = 40;
+    name.setAttribute('aria-label', 'Nama kategori');
+    name.addEventListener('change', (e) => {
+      const v = e.target.value.trim();
+      if (!v) { e.target.value = cat.label; return; }
+      cat.label = v;
+      applyCategoryChange(cat.id);
+    });
+
+    const count = document.createElement('span');
+    count.className = 'cat-count';
+    count.textContent = n ? n + ' fitur' : '—';
+    count.title = n ? n + ' fitur memakai kategori ini' : 'Belum dipakai';
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'cat-del';
+    del.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6 L18 18 M18 6 L6 18"/></svg>';
+    del.title = n ? 'Kategori masih dipakai ' + n + ' fitur' : 'Hapus kategori';
+    del.setAttribute('aria-label', 'Hapus kategori ' + cat.label);
+    del.disabled = n > 0 || CATEGORIES.length <= 1;
+    del.addEventListener('click', () => deleteCategory(cat.id));
+
+    head.appendChild(swatch);
+    head.appendChild(name);
+    head.appendChild(count);
+    head.appendChild(del);
+    row.appendChild(head);
+
+    /* ---- Panel warna: palet + hex + preview ---- */
+    if (activeSwatchId === cat.id) {
+      const panel = document.createElement('div');
+      panel.className = 'cat-panel';
+
+      // Preview: kotak isian + garis + contoh label legenda
+      const prev = document.createElement('div');
+      prev.className = 'cat-preview';
+      prev.innerHTML =
+        '<span class="cat-prev-fill" style="background:' + esc(cat.color) + '"></span>' +
+        '<span class="cat-prev-line" style="border-top-color:' + esc(cat.color) + '"></span>' +
+        '<span class="cat-prev-dot" style="background:' + esc(cat.color) + '"></span>' +
+        '<span class="cat-prev-label" style="background:' + esc(cat.color) + ';color:' + checkColor + '">' +
+          esc(cat.label.slice(0, 14)) + '</span>';
+      panel.appendChild(prev);
+
+      // Palet siap pakai
+      PALETTE.forEach(group => {
+        const g = document.createElement('div');
+        g.className = 'cat-palette-group';
+        const t = document.createElement('div');
+        t.className = 'cat-palette-title';
+        t.textContent = group.name;
+        g.appendChild(t);
+        const grid = document.createElement('div');
+        grid.className = 'cat-palette';
+        group.colors.forEach(hex => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'cat-palette-dot';
+          b.style.background = hex;
+          b.title = hex;
+          b.setAttribute('aria-label', 'Pakai warna ' + hex);
+          if (normalizeHex(cat.color) === hex) b.classList.add('active');
+          b.addEventListener('click', () => {
+            setCategoryColor(cat.id, hex);
+            applyCategoryChange(cat.id);
+          });
+          grid.appendChild(b);
+        });
+        g.appendChild(grid);
+        panel.appendChild(g);
+      });
+
+      // HEX manual + color picker bawaan + eyedropper
+      const manual = document.createElement('div');
+      manual.className = 'cat-manual';
+
+      const hexInput = document.createElement('input');
+      hexInput.type = 'text';
+      hexInput.className = 'cat-hex';
+      hexInput.value = cat.color;
+      hexInput.maxLength = 7;
+      hexInput.spellcheck = false;
+      hexInput.setAttribute('aria-label', 'Kode warna HEX');
+      hexInput.addEventListener('change', (e) => {
+        const v = normalizeHex(e.target.value);
+        if (!v) { e.target.value = cat.color; toast('Kode HEX tidak valid'); return; }
+        e.target.value = v;
+        setCategoryColor(cat.id, v);
+        applyCategoryChange(cat.id);
+      });
+      manual.appendChild(hexInput);
+
+      const native = document.createElement('input');
+      native.type = 'color';
+      native.className = 'cat-native';
+      native.value = normalizeHex(cat.color) || '#000000';
+      native.setAttribute('aria-label', 'Pilih warna bebas');
+      native.addEventListener('input', (e) => {
+        setCategoryColor(cat.id, e.target.value);
+        const hx = document.querySelector('.cat-row[data-cat="' + cat.id + '"] .cat-hex');
+        if (hx) hx.value = e.target.value;
+        applyCategoryChange(cat.id);
+      });
+      manual.appendChild(native);
+
+      // Eyedropper (bila browser mendukung) — ambil warna dari mana saja di layar
+      if (window.EyeDropper) {
+        const pick = document.createElement('button');
+        pick.type = 'button';
+        pick.className = 'cat-eyedrop';
+        pick.textContent = 'Ambil dari layar';
+        pick.addEventListener('click', () => {
+          new window.EyeDropper().open().then(res => {
+            const v = normalizeHex(res.sRGBHex);
+            if (!v) return;
+            setCategoryColor(cat.id, v);
+            applyCategoryChange(cat.id);
+          }).catch(() => { /* dibatalkan user */ });
+        });
+        manual.appendChild(pick);
+      }
+
+      panel.appendChild(manual);
+      row.appendChild(panel);
+    }
+
     host.appendChild(row);
   });
+
+  // Peringatan warna kembar
+  const warnBox = $('#cat-dupe-warn');
+  if (warnBox) {
+    if (dupes.length) {
+      warnBox.textContent = 'Warna sama: ' +
+        dupes.map(g => g.map(c => c.label).join(' & ')).join('; ') +
+        '. Legenda jadi sulit dibedakan.';
+      warnBox.classList.remove('hidden');
+    } else {
+      warnBox.classList.add('hidden');
+    }
+  }
 }
 
-function resetCategoryColors() {
-  CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
-  features.forEach(f => applyStyle(f));
+function addCategory() {
+  const id = newCategoryId();
+  // Pilih warna yang belum terpakai agar tidak langsung kembar.
+  const taken = new Set(CATEGORIES.map(c => normalizeHex(c.color)));
+  const flat = PALETTE.reduce((a, g) => a.concat(g.colors), []);
+  const free = flat.find(h => !taken.has(h)) || '#6c757d';
+  CATEGORIES.push({ id, label: 'Kategori Baru', color: free });
+  activeSwatchId = id;
+  applyCategoryChange(id);
+  const inp = document.querySelector('.cat-row[data-cat="' + id + '"] .cat-name-input');
+  if (inp) { inp.focus(); inp.select(); }
+}
+
+function deleteCategory(id) {
+  const idx = CATEGORIES.findIndex(c => c.id === id);
+  if (idx < 0) return;
+  const cat = CATEGORIES[idx];
+  const n = categoryUsage()[id] || 0;
+  if (n > 0) { toast('Kategori ini masih dipakai ' + n + ' fitur'); return; }
+  if (CATEGORIES.length <= 1) { toast('Minimal harus ada satu kategori'); return; }
+  CATEGORIES.splice(idx, 1);
+  if (activeSwatchId === id) activeSwatchId = null;
   renderCategoryColors();
+  renderCategorySelect();
   renderList();
   if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
   save();
-  toast('Warna kategori dikembalikan ke bawaan');
+  toast('Kategori "' + cat.label + '" dihapus');
+}
+
+// Select di modal harus ikut berubah saat kategori ditambah/dihapus.
+function renderCategorySelect() {
+  const sel = $('#attr-category');
+  if (!sel) return;
+  const keep = sel.value;
+  sel.innerHTML = '';
+  CATEGORIES.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id;
+    o.textContent = c.label;
+    sel.appendChild(o);
+  });
+  if (CATEGORIES.some(c => c.id === keep)) sel.value = keep;
+}
+
+function resetCategoryColors() {
+  // Kategori kustom buatan user tetap dipertahankan; hanya warna & nama
+  // kategori bawaan yang dikembalikan.
+  const custom = CATEGORIES.filter(c => !DEFAULT_CATEGORIES.some(d => d.id === c.id));
+  CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c)).concat(custom);
+  features.forEach(f => applyStyle(f));
+  renderCategoryColors();
+  renderCategorySelect();
+  renderList();
+  if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
+  save();
+  toast('Warna bawaan dipulihkan');
 }
 
 /* -------------------- Pencarian lokasi (Nominatim) -------------------- */
@@ -1027,8 +1310,9 @@ function save() {
                 showScale: layout.showScale, showCredit: layout.showCredit,
                 tpl: layout.tpl,
                 kop: Object.assign({}, layout.kop) },
-      // Warna kustom per kategori (nama kategori -> warna)
+      // Daftar kategori lengkap: warna + nama kustom + kategori tambahan user.
       catColors: CATEGORIES.reduce((acc, c) => { acc[c.id] = c.color; return acc; }, {}),
+      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color })),
       features: features.map(f => ({
         id: f.id, name: f.name, category: f.category, desc: f.desc, type: f.type,
         geometry: layerToGeometry(f.layer, f.type)
@@ -1094,8 +1378,18 @@ function load() {
     }
   }
 
-  // Pulihkan warna kategori kustom
-  if (data.catColors) {
+  // Pulihkan kategori: daftar lengkap bila ada (menyimpan nama kustom &
+  // kategori tambahan), kalau tidak fallback ke peta warna lama.
+  if (Array.isArray(data.categories) && data.categories.length) {
+    CATEGORIES = data.categories
+      .filter(c => c && typeof c.id === 'string')
+      .map(c => ({
+        id: c.id,
+        label: (typeof c.label === 'string' && c.label.trim()) ? c.label : c.id,
+        color: normalizeHex(c.color) || '#6c757d'
+      }));
+    if (!CATEGORIES.length) CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
+  } else if (data.catColors) {
     Object.keys(data.catColors).forEach(catId => {
       if (typeof data.catColors[catId] === 'string') {
         setCategoryColor(catId, data.catColors[catId]);
@@ -1120,6 +1414,8 @@ function load() {
   });
 
   renderList();
+  renderCategoryColors();
+  renderCategorySelect();
   if (data.basemap && BASEMAPS[data.basemap]) setBasemap(data.basemap);
   if (data.view) {
     try { map.setView([data.view.lat, data.view.lng], data.view.zoom); } catch (e) {}
@@ -1359,6 +1655,7 @@ function init() {
   // ---- Layout peta ----
   bindLayout();
   renderCategoryColors();
+  renderCategorySelect();
 
   // Pasang peta dasar default (tanpa save), lalu muat data lama.
   setBasemap(currentBasemap, true);

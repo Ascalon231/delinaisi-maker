@@ -30,8 +30,12 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
   - **Diagram lokasi** (inset map): peta Leaflet kedua yang zoom-out, dengan
     **kotak merah** yang mengikuti `getBounds()` peta utama secara real-time,
     plus grid koordinatnya sendiri
-  - **Legenda otomatis** dari kategori unik yang dipakai fitur — lengkap dengan
-    **color picker per kategori** agar warna konsisten di peta & legenda
+  - **Legenda otomatis** dari kategori unik yang dipakai fitur
+  - **Pengelola warna kategori**: klik kotak warna untuk membuka palet 48 warna
+    siap pakai (6 grup), input HEX manual, color picker bebas, dan eyedropper
+    (bila browser mendukung). Ada pratinjau cara warna tampil di peta/legenda,
+    peringatan bila dua kategori berwarna sama, serta kategori bisa
+    **ditambah, diganti nama, dan dihapus** — semuanya tersimpan otomatis
   - Blok Proyeksi/Zona/Datum, Sumber Data, dan pengesahan tanda tangan
   - Semua teks berasal dari input user (generik, bisa untuk topik apa pun)
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
@@ -67,7 +71,7 @@ Tidak perlu `npm install` hanya untuk memakai aplikasi — semua pustaka dimuat 
 npm install
 npx playwright install chromium
 
-# Jalankan test (21 test)
+# Jalankan test (26 test)
 npm test
 ```
 
