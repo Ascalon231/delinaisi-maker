@@ -1121,3 +1121,27 @@ test('batas administrasi: status jelas saat gagal & saat kueri terlalu pendek', 
   await expect(page.locator('#admin-status')).toHaveClass(/is-error/);
   await expect(page.locator('#admin-status')).toContainText('Gagal mencari');
 });
+
+test('batas administrasi: legenda formal tetap terisi walau belum ada fitur', async ({ page }) => {
+  await mockNominatim(page);
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Tanpa satu pun fitur delinasi, muat batas administrasi saja
+  await expect(page.locator('#feat-count')).toHaveText('0');
+  await page.locator('#admin-q').fill('Bogor');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1200);
+  await page.locator('.admin-item').first().click();
+  await page.waitForTimeout(1200);
+
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1600);
+
+  // Batas tetap dijelaskan di legenda (bukan "Belum ada fitur")
+  await expect(page.locator('#fl-legend .fl-legend-empty')).toHaveCount(0);
+  await expect(page.locator('#fl-legend .fl-legend-sub')).toHaveCount(1);
+  await expect(page.locator('#fl-legend .fl-legend-sub')).toHaveText('Batas Administrasi');
+  await expect(page.locator('#fl-legend .fl-legend-label')).toHaveText('Bogor');
+});

@@ -395,14 +395,19 @@ const FormalSheet = (function () {
     if (!host) return;
     host.innerHTML = '';
 
-    if (!features || !features.length) {
+    const adminLoaded = (typeof AdminBoundaries !== 'undefined' && AdminBoundaries.hasData());
+
+    // Legenda boleh kosong hanya bila tidak ada fitur DAN tidak ada batas
+    // administrasi yang dimuat — batas juga tampil di peta, jadi wajib
+    // dijelaskan di lembar cetak.
+    if ((!features || !features.length) && !adminLoaded) {
       host.appendChild(el('div', 'fl-legend-empty', 'Belum ada fitur.'));
       return;
     }
 
     // Kelompokkan per kategori, catat jenis geometrinya.
     const used = new Map();
-    features.forEach(f => {
+    (features || []).forEach(f => {
       if (!used.has(f.category)) {
         used.set(f.category, { lines: 0, polys: 0, points: 0 });
       }
@@ -440,7 +445,7 @@ const FormalSheet = (function () {
 
     // Batas administrasi yang dimuat user ikut masuk legenda, karena
     // garisnya tampil di peta dan wajib dijelaskan di lembar cetak.
-    if (typeof AdminBoundaries !== 'undefined' && AdminBoundaries.hasData()) {
+    if (adminLoaded) {
       const g = el('div', 'fl-legend-group');
       g.appendChild(el('div', 'fl-legend-sub', 'Batas Administrasi'));
       const row = el('div', 'fl-legend-item');
