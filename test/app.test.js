@@ -3338,6 +3338,193 @@ test('pewarnaan & transparansi: opacity slider per fitur dan per kategori, serta
   expect(savedState.fillOpacity).toBe(0.65);
 });
 
+test('accordion layout: buka/tutup, aksi cepat & sinkronisasi klik lembar peta', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Kartu accordion harus ada di DOM
+  const cards = page.locator('.kop-accordion-card');
+  await expect(cards).toHaveCount(11);
+
+  // Uji tombol Tutup Semua
+  await page.locator('#btn-acc-collapse-all').click();
+  await page.waitForTimeout(300);
+  await expect(page.locator('.kop-accordion-card.is-open')).toHaveCount(0);
+
+  // Uji tombol Buka Semua
+  await page.locator('#btn-acc-expand-all').click();
+  await page.waitForTimeout(300);
+  await expect(page.locator('.kop-accordion-card.is-open')).toHaveCount(11);
+
+  // Tutup kartu skala secara individual
+  const scaleHeader = page.locator('#kop-acc-scale .kop-accordion-header');
+  await scaleHeader.click();
+  await page.waitForTimeout(300);
+  await expect(page.locator('#kop-acc-scale')).not.toHaveClass(/is-open/);
+
+  // Klik blok skala di lembar peta -> accordion skala otomatis terbuka & ter-highlight
+  await page.locator('.fl-blk-scale').click();
+  await page.waitForTimeout(400);
+  await expect(page.locator('#kop-acc-scale')).toHaveClass(/is-open/);
+  await expect(page.locator('#kop-acc-scale')).toHaveClass(/is-highlighted/);
+
+  // Uji live summary badge saat mengetik judul
+  await page.locator('#layout-title').fill('Peta Studi Tata Ruang 2026');
+  await page.waitForTimeout(300);
+  await expect(page.locator('#acc-badge-title')).toHaveText('Peta Studi Tata Ru…');
+
+  // Uji chip skala cepat
+  const chip10k = page.locator('.scale-chip[data-scale="10000"]');
+  await chip10k.click();
+  await page.waitForTimeout(400);
+  await expect(page.locator('#kop-scale-preset')).toHaveValue('10000');
+  await expect(chip10k).toHaveClass(/is-active/);
+});
+
+test('tata letak kop: mendukung 4 variasi posisi (kanan, kiri, bawah, atas)', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  const sheet = page.locator('.formal-sheet');
+  const posSelect = page.locator('#kop-panel-position');
+
+  // Posisi bawaan: kanan
+  await expect(sheet).toHaveClass(/fl-pos-right/);
+  await expect(page.locator('#acc-badge-align')).toHaveText('Posisi: Kanan');
+
+  // Ubah ke kiri
+  await posSelect.selectOption('left');
+  await page.waitForTimeout(400);
+  await expect(sheet).toHaveClass(/fl-pos-left/);
+  await expect(page.locator('#acc-badge-align')).toHaveText('Posisi: Kiri');
+
+  // Ubah ke bawah (mendatar)
+  await posSelect.selectOption('bottom');
+  await page.waitForTimeout(400);
+  await expect(sheet).toHaveClass(/fl-pos-bottom/);
+  await expect(page.locator('#acc-badge-align')).toHaveText('Posisi: Bawah');
+
+  // Ubah ke atas (mendatar)
+  await posSelect.selectOption('top');
+  await page.waitForTimeout(400);
+  await expect(sheet).toHaveClass(/fl-pos-top/);
+  await expect(page.locator('#acc-badge-align')).toHaveText('Posisi: Atas');
+
+  // Kembalikan ke kanan
+  await posSelect.selectOption('right');
+  await page.waitForTimeout(400);
+  await expect(sheet).toHaveClass(/fl-pos-right/);
+
+  // Cek apakah tersimpan ke localStorage
+  const saved = await page.evaluate(() => {
+    const raw = localStorage.getItem('delinaisi-maker-v1');
+    return JSON.parse(raw).layout.kop.panelPosition;
+  });
+  expect(saved).toBe('right');
+});
+
+test('segmented controls: posisi kop dan perataan teks tersinkronisasi dua arah', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // 1. Klik tombol segmented posisi kop "Bawah"
+  const btnBottom = page.locator('#seg-panel-position .seg-btn[data-val="bottom"]');
+  await btnBottom.click();
+  await page.waitForTimeout(400);
+
+  await expect(btnBottom).toHaveClass(/is-active/);
+  await expect(page.locator('#kop-panel-position')).toHaveValue('bottom');
+  await expect(page.locator('.formal-sheet')).toHaveClass(/fl-pos-bottom/);
+
+  // 2. Klik tombol segmented perataan judul "Kiri"
+  const btnTitleLeft = page.locator('#seg-title-align .seg-btn[data-val="left"]');
+  await btnTitleLeft.click();
+  await page.waitForTimeout(400);
+
+  await expect(btnTitleLeft).toHaveClass(/is-active/);
+  await expect(page.locator('#kop-title-align')).toHaveValue('left');
+
+  // 3. Sinkronisasi balik: ubah select secara langsung, seg-btn ikut update
+  await page.selectOption('#kop-panel-position', 'left');
+  await page.waitForTimeout(400);
+
+  const btnLeft = page.locator('#seg-panel-position .seg-btn[data-val="left"]');
+  await expect(btnLeft).toHaveClass(/is-active/);
+  await expect(page.locator('.formal-sheet')).toHaveClass(/fl-pos-left/);
+});
+
+test('tipografi kop: mendukung variasi font (Serif, Sans, Mono, Humanist) dan bertahan saat reload', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  const sheet = page.locator('.formal-sheet');
+
+  // Default: serif
+  await expect(sheet).toHaveClass(/fl-font-serif/);
+
+  // Pilih font Sans (Modern)
+  const chipSans = page.locator('#kop-font-chips .font-chip[data-font="sans"]');
+  await chipSans.click();
+  await page.waitForTimeout(400);
+
+  await expect(chipSans).toHaveClass(/is-active/);
+  await expect(sheet).toHaveClass(/fl-font-sans/);
+  await expect(page.locator('#kop-font-family')).toHaveValue('sans');
+
+  // Pilih font Mono (Teknis)
+  const chipMono = page.locator('#kop-font-chips .font-chip[data-font="mono"]');
+  await chipMono.click();
+  await page.waitForTimeout(400);
+
+  await expect(chipMono).toHaveClass(/is-active/);
+  await expect(sheet).toHaveClass(/fl-font-mono/);
+
+  // Reload halaman & pastikan pilihan font tetap bertahan
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d),
+    await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1')));
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await expect(page.locator('.formal-sheet')).toHaveClass(/fl-font-mono/);
+  await expect(page.locator('#kop-font-chips .font-chip[data-font="mono"]')).toHaveClass(/is-active/);
+});
+
+test('template kop instan: 1-klik mengisi identitas, tercermin di peta & tersimpan di history', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Klik template Studio PWK
+  const btnPwk = page.locator('.kop-tpl-btn[data-kop-tpl="pwk"]');
+  await btnPwk.click();
+  await page.waitForTimeout(500);
+
+  // Cek input form dan lembar peta terisi
+  await expect(page.locator('#layout-title')).toHaveValue('PETA DELINIASI KAWASAN PERENCANAAN');
+  await expect(page.locator('#kop-programStudy')).toHaveValue('Program Studi Perencanaan Wilayah dan Kota');
+
+  const sheetTitle = page.locator('#fl-title');
+  await expect(sheetTitle).toContainText('PETA DELINIASI KAWASAN PERENCANAAN');
+
+  const sheetInst = page.locator('#fl-kop-study');
+  await expect(sheetInst).toContainText('Program Studi Perencanaan Wilayah dan Kota');
+
+  // Cek toast muncul
+  await expect(page.locator('.toast')).toContainText('Template Studio PWK berhasil diterapkan');
+
+  // Undo (Ctrl+Z) memulihkan kondisi sebelumnya
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(500);
+
+  const undoneTitle = await page.locator('#layout-title').inputValue();
+  expect(undoneTitle).not.toBe('PETA DELINIASI KAWASAN PERENCANAAN');
+});
+
 
 
 

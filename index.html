@@ -199,309 +199,558 @@
             </div>
           </div>
 
-          <!-- KONTROL UTAMA: Komponen Kop (+ / -) -->
-          <div class="kop-subgroup kop-subgroup-top">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-              <span>Komponen Kop Peta (+ / −)</span>
+          <div class="kop-templates-section" id="kop-templates-section">
+            <div class="kop-templates-header">
+              <span class="kop-templates-title">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                Template Kop Instan
+              </span>
+              <span class="kop-templates-hint">1-klik isi otomatis</span>
             </div>
-            <p class="hint hint-tight">Klik tombol untuk menambah atau mengurangi komponen pada lembar peta:</p>
-            <div id="blok-toggles" class="blok-toggles-list"></div>
-            <div class="blok-aksi">
-              <button type="button" id="blok-all-on" class="link-btn">+ Tampilkan semua</button>
-              <span class="blok-sep">·</span>
-              <button type="button" id="blok-all-off" class="link-btn">− Sembunyikan semua</button>
-            </div>
-            <div class="blok-custom-add-wrap">
-              <button type="button" id="btn-add-custom-block" class="btn-add-custom-block">
-                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                Tambah Bagian Kustom
+            <div class="kop-template-chips" id="kop-template-chips">
+              <button type="button" class="kop-tpl-btn" data-kop-tpl="pwk" title="Format baku Studio PWK & Perencanaan Wilayah">
+                <span class="kop-tpl-icon">🏛️</span>
+                <span class="kop-tpl-info">
+                  <strong>Studio PWK</strong>
+                  <small>Perencanaan Wilayah &amp; Kota</small>
+                </span>
+              </button>
+              <button type="button" class="kop-tpl-btn" data-kop-tpl="skripsi" title="Format baku Skripsi & Penelitian Mahasiswa">
+                <span class="kop-tpl-icon">🎓</span>
+                <span class="kop-tpl-info">
+                  <strong>Skripsi / TA</strong>
+                  <small>Penelitian &amp; Geodesi</small>
+                </span>
+              </button>
+              <button type="button" class="kop-tpl-btn" data-kop-tpl="pupr" title="Format baku Dinas PUPR / RTRW Pemda">
+                <span class="kop-tpl-icon">🏢</span>
+                <span class="kop-tpl-info">
+                  <strong>Dinas PUPR</strong>
+                  <small>Kedinasan &amp; Tata Ruang</small>
+                </span>
+              </button>
+              <button type="button" class="kop-tpl-btn" data-kop-tpl="masterplan" title="Format baku Konsultan Perencana & Masterplan">
+                <span class="kop-tpl-icon">📐</span>
+                <span class="kop-tpl-info">
+                  <strong>Masterplan</strong>
+                  <small>Konsultan &amp; Site Plan</small>
+                </span>
               </button>
             </div>
           </div>
 
-          <!-- PENGATURAN PERATAAN TEKS (Alignment) -->
-          <div class="kop-subgroup">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
-              <span>Perataan Teks Kop (Tata Letak)</span>
+          <div class="kop-acc-toolbar">
+            <span class="kop-acc-toolbar-label">Bagian Lembar Peta</span>
+            <div class="kop-acc-toolbar-actions">
+              <button type="button" id="btn-acc-expand-all" class="link-btn" title="Buka semua kartu accordion">Buka semua</button>
+              <span class="blok-sep">·</span>
+              <button type="button" id="btn-acc-collapse-all" class="link-btn" title="Tutup semua kartu accordion">Tutup semua</button>
             </div>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Perataan Judul</span>
-                <select id="kop-title-align">
-                  <option value="center" selected>Tengah</option>
-                  <option value="left">Kiri</option>
-                  <option value="right">Kanan</option>
-                </select>
-              </label>
-              <label class="field field-tight">
-                <span>Perataan Instansi</span>
-                <select id="kop-inst-align">
-                  <option value="left" selected>Kiri (Logo kiri)</option>
-                  <option value="center">Tengah (Logo atas)</option>
-                  <option value="right">Kanan (Logo kanan)</option>
-                </select>
-              </label>
-            </div>
-            <label class="field field-tight">
-              <span>Posisi Pengesahan (Tanda Tangan)</span>
-              <select id="kop-sign-align">
-                <option value="right" selected>Kanan (Standar)</option>
-                <option value="center">Tengah</option>
-                <option value="left">Kiri</option>
-              </select>
-            </label>
           </div>
 
-          <!-- FORM PENGISIAN TERKELOMPOK -->
-          <!-- 1. Judul Peta -->
-          <div class="kop-subgroup" data-blok-section="title">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
-              <span>Judul Peta</span>
-            </div>
-            <label class="field field-tight">
-              <span>Judul peta</span>
-              <input id="layout-title" type="text" placeholder="mis. Peta Delinasi Zona Industri Pesisir" maxlength="90">
-            </label>
-          </div>
-
-          <!-- 2. Identitas Instansi & Logo -->
-          <div class="kop-subgroup" data-blok-section="kop">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 21V11h4v10M12 3l9 4H3l9-4z"/></svg>
-              <span>Identitas Instansi &amp; Logo</span>
-            </div>
-            <label class="field field-tight">
-              <span>Instansi / Lembaga / Unit Kerja</span>
-              <input id="kop-programStudy" type="text" placeholder="mis. Dinas Lingkungan Hidup / PT Konsultan Utama / PWK" maxlength="90">
-            </label>
-            <label class="field field-tight">
-              <span>Institusi Induk / Organisasi / Badan</span>
-              <input id="kop-institution" type="text" placeholder="mis. Pemerintah Daerah / Kementerian / Universitas Hasanuddin" maxlength="90">
-            </label>
-            <div class="field field-tight">
-              <span>Logo instansi</span>
-              <div class="logo-pick">
-                <div id="logo-preview" class="logo-preview">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#b3bccb" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3 L20.5 8 v9 L12 21 L3.5 17 v-9 z"/><path d="M12 3 v18"/></svg>
+          <div class="kop-accordion-list" id="kop-accordion-list">
+            <!-- KONTROL UTAMA: Komponen Kop (+ / -) -->
+            <div class="kop-accordion-card kop-subgroup kop-subgroup-top" id="kop-acc-blocks">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="blocks">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                  <span class="kop-acc-title">Komponen Kop Peta (+ / −)</span>
                 </div>
-                <div class="logo-pick-actions">
-                  <button type="button" id="logo-upload-btn" class="btn btn-secondary btn-sm">Unggah logo</button>
-                  <button type="button" id="logo-remove-btn" class="btn btn-danger-ghost btn-sm">Hapus</button>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-blocks">9 aktif</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
-                <input type="file" id="logo-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+              </button>
+              <div class="kop-accordion-body">
+                <p class="hint hint-tight">Klik tombol untuk menambah atau mengurangi komponen pada lembar peta:</p>
+                <div id="blok-toggles" class="blok-toggles-list"></div>
+                <div class="blok-aksi">
+                  <button type="button" id="blok-all-on" class="link-btn">+ Tampilkan semua</button>
+                  <span class="blok-sep">·</span>
+                  <button type="button" id="blok-all-off" class="link-btn">− Sembunyikan semua</button>
+                </div>
+                <div class="blok-custom-add-wrap">
+                  <button type="button" id="btn-add-custom-block" class="btn-add-custom-block">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Tambah Bagian Kustom
+                  </button>
+                </div>
               </div>
-              <p class="hint hint-tight" id="logo-hint">PNG/JPG/SVG, maks 1 MB. Disimpan di browser Anda.</p>
             </div>
-          </div>
 
-          <!-- 3. Kegiatan & Waktu -->
-          <div class="kop-subgroup" data-blok-section="activity">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <span>Kegiatan &amp; Waktu</span>
-            </div>
-            <label class="field field-tight">
-              <span>Nama Kegiatan / Proyek / Pekerjaan</span>
-              <input id="kop-activityTitle" type="text" placeholder="mis. Rencana Tata Ruang Wilayah / Pemetaan Kawasan 2025" maxlength="90">
-            </label>
-            <label class="field field-tight">
-              <span>Tahun Pelaksanaan</span>
-              <input id="kop-activityYear" type="text" placeholder="mis. 2025" maxlength="12">
-            </label>
-          </div>
+            <!-- PENGATURAN TATA LETAK, TIPOGRAFI & PERATAAN -->
+            <div class="kop-accordion-card kop-subgroup" id="kop-acc-align">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="align">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+                  <span class="kop-acc-title">Tata Letak &amp; Tipografi Lembar</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-align">Kanan · Serif</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <!-- Posisi Kop Peta -->
+                <div class="field field-tight">
+                  <span>Posisi Kop Lembar Peta</span>
+                  <select id="kop-panel-position" class="visually-hidden">
+                    <option value="right" selected>Kanan Peta (Standar)</option>
+                    <option value="left">Kiri Peta</option>
+                    <option value="bottom">Bawah Peta (Mendatar)</option>
+                    <option value="top">Atas Peta (Mendatar)</option>
+                  </select>
+                  <div class="seg-control" id="seg-panel-position">
+                    <button type="button" class="seg-btn is-active" data-val="right" title="Posisi Kop di Kanan Peta">
+                      <svg viewBox="0 0 18 14" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="16" height="12" rx="1.5"/><line x1="11" y1="1" x2="11" y2="13"/><rect x="11.5" y="1.5" width="5" height="11" fill="currentColor" opacity="0.35"/></svg>
+                      Kanan
+                    </button>
+                    <button type="button" class="seg-btn" data-val="left" title="Posisi Kop di Kiri Peta">
+                      <svg viewBox="0 0 18 14" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="16" height="12" rx="1.5"/><line x1="7" y1="1" x2="7" y2="13"/><rect x="1.5" y="1.5" width="5" height="11" fill="currentColor" opacity="0.35"/></svg>
+                      Kiri
+                    </button>
+                    <button type="button" class="seg-btn" data-val="bottom" title="Posisi Kop di Bawah Peta (Mendatar)">
+                      <svg viewBox="0 0 18 14" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="16" height="12" rx="1.5"/><line x1="1" y1="8" x2="17" y2="8"/><rect x="1.5" y="8.5" width="15" height="4" fill="currentColor" opacity="0.35"/></svg>
+                      Bawah
+                    </button>
+                    <button type="button" class="seg-btn" data-val="top" title="Posisi Kop di Atas Peta (Mendatar)">
+                      <svg viewBox="0 0 18 14" width="13" height="10" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="16" height="12" rx="1.5"/><line x1="1" y1="6" x2="17" y2="6"/><rect x="1.5" y="1.5" width="15" height="4" fill="currentColor" opacity="0.35"/></svg>
+                      Atas
+                    </button>
+                  </div>
+                </div>
 
-          <!-- Skala & Arah Utara -->
-          <div class="kop-subgroup" data-blok-section="scale">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12 2 15 12 12 9 9 12 12 2"/></svg>
-              <span>Skala &amp; Arah Utara</span>
-            </div>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Model Arah Utara</span>
-                <select id="kop-north-style">
-                  <option value="classic" selected>Klasik Formal</option>
-                  <option value="triangle">Segitiga Presisi (PWK)</option>
-                  <option value="modern">Modern Minimalis</option>
-                  <option value="star">Bintang 8 Arah</option>
-                  <option value="survey">Standar Topografi BIG</option>
-                </select>
-              </label>
-              <label class="field field-tight">
-                <span>Huruf Arah</span>
-                <select id="kop-north-letter">
-                  <option value="U" selected>U (Utara - ID)</option>
-                  <option value="N">N (North - EN)</option>
-                </select>
-              </label>
-            </div>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Mode Skala</span>
-                <select id="kop-scale-mode">
-                  <option value="auto" selected>Otomatis (Zoom Peta)</option>
-                  <option value="custom">Kustom / Presisi</option>
-                </select>
-              </label>
-              <label class="field field-tight">
-                <span>Pilihan Skala Bulat</span>
-                <select id="kop-scale-preset">
-                  <option value="1000">1 : 1.000</option>
-                  <option value="2500">1 : 2.500</option>
-                  <option value="5000">1 : 5.000</option>
-                  <option value="10000">1 : 10.000</option>
-                  <option value="25000" selected>1 : 25.000</option>
-                  <option value="50000">1 : 50.000</option>
-                  <option value="100000">1 : 100.000</option>
-                  <option value="250000">1 : 250.000</option>
-                </select>
-              </label>
-            </div>
-            <div class="field field-tight" id="kop-scale-custom-wrap">
-              <span>Angka Skala 1 :</span>
-              <div style="display: flex; gap: 6px; align-items: center;">
-                <input id="kop-scale-custom" type="number" placeholder="mis. 25000" value="25000" style="flex: 1 1 auto;">
-                <button type="button" id="btn-apply-scale" class="btn btn-secondary btn-sm" style="flex: none; white-space: nowrap;">Terapkan ke Zoom</button>
+                <!-- Tipografi Font Lembar -->
+                <div class="field field-tight">
+                  <span>Gaya Font Lembar Peta</span>
+                  <select id="kop-font-family" class="visually-hidden">
+                    <option value="serif" selected>Serif Akademik (Times New Roman)</option>
+                    <option value="sans">Modern Sans (Bersih Kontemporer)</option>
+                    <option value="mono">Teknis / CAD (Monospace)</option>
+                    <option value="humanist">Humanist / Elegan (Trebuchet)</option>
+                  </select>
+                  <div class="font-chips-grid" id="kop-font-chips">
+                    <button type="button" class="font-chip is-active" data-font="serif" style="font-family: 'Times New Roman', Georgia, serif;">
+                      <span class="font-chip-sample">Aa</span>
+                      <span class="font-chip-name">Serif Akademik</span>
+                    </button>
+                    <button type="button" class="font-chip" data-font="sans" style="font-family: system-ui, -apple-system, sans-serif;">
+                      <span class="font-chip-sample">Aa</span>
+                      <span class="font-chip-name">Modern Sans</span>
+                    </button>
+                    <button type="button" class="font-chip" data-font="mono" style="font-family: 'SF Mono', Consolas, monospace;">
+                      <span class="font-chip-sample">Aa</span>
+                      <span class="font-chip-name">Teknis / CAD</span>
+                    </button>
+                    <button type="button" class="font-chip" data-font="humanist" style="font-family: 'Trebuchet MS', 'Lucida Sans', sans-serif;">
+                      <span class="font-chip-sample">Aa</span>
+                      <span class="font-chip-name">Humanist</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Perataan Teks (Judul & Instansi) -->
+                <div class="kop-grid">
+                  <div class="field field-tight">
+                    <span>Perataan Judul</span>
+                    <select id="kop-title-align" class="visually-hidden">
+                      <option value="left">Kiri</option>
+                      <option value="center" selected>Tengah</option>
+                      <option value="right">Kanan</option>
+                    </select>
+                    <div class="seg-control" id="seg-title-align">
+                      <button type="button" class="seg-btn" data-val="left" title="Rata Kiri">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>
+                        Kiri
+                      </button>
+                      <button type="button" class="seg-btn is-active" data-val="center" title="Rata Tengah">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>
+                        Tengah
+                      </button>
+                      <button type="button" class="seg-btn" data-val="right" title="Rata Kanan">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></svg>
+                        Kanan
+                      </button>
+                    </div>
+                  </div>
+                  <div class="field field-tight">
+                    <span>Perataan Instansi</span>
+                    <select id="kop-inst-align" class="visually-hidden">
+                      <option value="left" selected>Kiri (Logo kiri)</option>
+                      <option value="center">Tengah (Logo atas)</option>
+                      <option value="right">Kanan (Logo kanan)</option>
+                    </select>
+                    <div class="seg-control" id="seg-inst-align">
+                      <button type="button" class="seg-btn is-active" data-val="left" title="Rata Kiri">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>
+                        Kiri
+                      </button>
+                      <button type="button" class="seg-btn" data-val="center" title="Rata Tengah">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>
+                        Tengah
+                      </button>
+                      <button type="button" class="seg-btn" data-val="right" title="Rata Kanan">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></svg>
+                        Kanan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Perataan Pengesahan -->
+                <div class="field field-tight">
+                  <span>Posisi Pengesahan (Tanda Tangan)</span>
+                  <select id="kop-sign-align" class="visually-hidden">
+                    <option value="left">Kiri</option>
+                    <option value="center">Tengah</option>
+                    <option value="right" selected>Kanan (Standar)</option>
+                  </select>
+                  <div class="seg-control" id="seg-sign-align">
+                    <button type="button" class="seg-btn" data-val="left" title="Rata Kiri">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="14" y2="12"/><line x1="4" y1="18" x2="18" y2="18"/></svg>
+                      Kiri
+                    </button>
+                    <button type="button" class="seg-btn" data-val="center" title="Rata Tengah">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="5" y1="18" x2="19" y2="18"/></svg>
+                      Tengah
+                    </button>
+                    <button type="button" class="seg-btn is-active" data-val="right" title="Rata Kanan">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="10" y1="12" x2="20" y2="12"/><line x1="6" y1="18" x2="20" y2="18"/></svg>
+                      Kanan
+                    </button>
+                  </div>
+                </div>
               </div>
-              <p class="hint hint-tight">Menyesuaikan zoom peta otomatis agar presisi dengan skala bulat ini.</p>
             </div>
-          </div>
 
-          <!-- 4. Sistem Koordinat & Proyeksi -->
-          <div class="kop-subgroup" data-blok-section="ref">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-              <span>Sistem Koordinat &amp; Grid</span>
+            <!-- FORM PENGISIAN TERKELOMPOK -->
+            <!-- 1. Judul Peta -->
+            <div class="kop-accordion-card kop-subgroup is-open" data-blok-section="title" id="kop-acc-title">
+              <button type="button" class="kop-accordion-header" aria-expanded="true" data-acc-target="title">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                  <span class="kop-acc-title">Judul Peta</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-title"></span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="field field-tight">
+                  <span>Judul peta</span>
+                  <input id="layout-title" type="text" placeholder="mis. Peta Delinasi Zona Industri Pesisir" maxlength="90">
+                </label>
+              </div>
             </div>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Proyeksi</span>
-                <input id="kop-projection" type="text" value="Universal Transverse Mercator" maxlength="60">
-              </label>
-              <label class="field field-tight">
-                <span>Zona</span>
-                <input id="kop-zone" type="text" value="UTM 52S" maxlength="30">
-              </label>
-            </div>
-            <label class="field field-tight">
-              <span>Datum</span>
-              <input id="kop-datum" type="text" value="WGS 1984" maxlength="40">
-            </label>
-            <label class="field field-tight">
-              <span>Posisi teks grid koordinat</span>
-              <select id="kop-grid-pos">
-                <option value="outside" selected>Di luar peta (margin frame)</option>
-                <option value="inside">Di dalam peta (penuh)</option>
-              </select>
-            </label>
-          </div>
 
-          <!-- Legenda -->
-          <div class="kop-subgroup" data-blok-section="legend">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-              <span>Legenda Peta</span>
+            <!-- 2. Identitas Instansi & Logo -->
+            <div class="kop-accordion-card kop-subgroup is-open" data-blok-section="kop" id="kop-acc-kop">
+              <button type="button" class="kop-accordion-header" aria-expanded="true" data-acc-target="kop">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 11h2M6 15h2M16 11h2M16 15h2M10 21V11h4v10M12 3l9 4H3l9-4z"/></svg>
+                  <span class="kop-acc-title">Identitas Instansi &amp; Logo</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-kop"></span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="field field-tight">
+                  <span>Instansi / Lembaga / Unit Kerja</span>
+                  <input id="kop-programStudy" type="text" placeholder="mis. Dinas Lingkungan Hidup / PT Konsultan Utama / PWK" maxlength="90">
+                </label>
+                <label class="field field-tight">
+                  <span>Institusi Induk / Organisasi / Badan</span>
+                  <input id="kop-institution" type="text" placeholder="mis. Pemerintah Daerah / Kementerian / Universitas Hasanuddin" maxlength="90">
+                </label>
+                <div class="field field-tight">
+                  <span>Logo instansi</span>
+                  <div class="logo-pick">
+                    <div id="logo-preview" class="logo-preview">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#b3bccb" stroke-width="1.5" stroke-linejoin="round"><path d="M12 3 L20.5 8 v9 L12 21 L3.5 17 v-9 z"/><path d="M12 3 v18"/></svg>
+                    </div>
+                    <div class="logo-pick-actions">
+                      <button type="button" id="logo-upload-btn" class="btn btn-secondary btn-sm">Unggah logo</button>
+                      <button type="button" id="logo-remove-btn" class="btn btn-danger-ghost btn-sm">Hapus</button>
+                    </div>
+                    <input type="file" id="logo-input" accept="image/png,image/jpeg,image/svg+xml,image/webp" hidden>
+                  </div>
+                  <p class="hint hint-tight" id="logo-hint">PNG/JPG/SVG, maks 1 MB. Disimpan di browser Anda.</p>
+                </div>
+              </div>
             </div>
-            <label class="toggle toggle-inline">
-              <input type="checkbox" id="kop-legend-show-measure" checked>
-              <span>Tampilkan total luas / panjang di legenda</span>
-            </label>
-            <p class="hint hint-tight">Otomatis menghitung luas poligon (ha/m²) atau panjang garis (km) pada tiap kategori legenda.</p>
-          </div>
 
-          <!-- 5. Sumber Data -->
-          <div class="kop-subgroup" data-blok-section="source">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-              <span>Sumber Data &amp; Referensi</span>
+            <!-- 3. Kegiatan & Waktu -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="activity" id="kop-acc-activity">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="activity">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <span class="kop-acc-title">Kegiatan &amp; Waktu</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-activity"></span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="field field-tight">
+                  <span>Nama Kegiatan / Proyek / Pekerjaan</span>
+                  <input id="kop-activityTitle" type="text" placeholder="mis. Rencana Tata Ruang Wilayah / Pemetaan Kawasan 2025" maxlength="90">
+                </label>
+                <label class="field field-tight">
+                  <span>Tahun Pelaksanaan</span>
+                  <input id="kop-activityYear" type="text" placeholder="mis. 2025" maxlength="12">
+                </label>
+              </div>
             </div>
-            <label class="field field-tight">
-              <span>Sumber data</span>
-              <textarea id="kop-sourceData" rows="2" placeholder="mis. Citra Satelit Resolusi Tinggi; OpenStreetMap; Survei Lapangan 2024" maxlength="400"></textarea>
-            </label>
-          </div>
 
-          <!-- 6. Pengesahan / Pembuat Peta -->
-          <div class="kop-subgroup" data-blok-section="sign">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              <span>Pengesahan &amp; Pembuat Peta</span>
+            <!-- Skala & Arah Utara -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="scale" id="kop-acc-scale">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="scale">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="12 2 15 12 12 9 9 12 12 2"/></svg>
+                  <span class="kop-acc-title">Skala &amp; Arah Utara</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-scale">1:25.000 · Otomatis</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <div class="kop-grid">
+                  <label class="field field-tight">
+                    <span>Model Arah Utara</span>
+                    <select id="kop-north-style">
+                      <option value="classic" selected>Klasik Formal</option>
+                      <option value="triangle">Segitiga Presisi (PWK)</option>
+                      <option value="modern">Modern Minimalis</option>
+                      <option value="star">Bintang 8 Arah</option>
+                      <option value="survey">Standar Topografi BIG</option>
+                    </select>
+                  </label>
+                  <label class="field field-tight">
+                    <span>Huruf Arah</span>
+                    <select id="kop-north-letter">
+                      <option value="U" selected>U (Utara - ID)</option>
+                      <option value="N">N (North - EN)</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="kop-grid">
+                  <label class="field field-tight">
+                    <span>Mode Skala</span>
+                    <select id="kop-scale-mode">
+                      <option value="auto" selected>Otomatis (Zoom Peta)</option>
+                      <option value="custom">Kustom / Presisi</option>
+                    </select>
+                  </label>
+                  <label class="field field-tight">
+                    <span>Pilihan Skala Bulat</span>
+                    <select id="kop-scale-preset">
+                      <option value="1000">1 : 1.000</option>
+                      <option value="2500">1 : 2.500</option>
+                      <option value="5000">1 : 5.000</option>
+                      <option value="10000">1 : 10.000</option>
+                      <option value="25000" selected>1 : 25.000</option>
+                      <option value="50000">1 : 50.000</option>
+                      <option value="100000">1 : 100.000</option>
+                      <option value="250000">1 : 250.000</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="scale-chips" id="scale-chips">
+                  <button type="button" class="scale-chip" data-scale="5000">1:5.000</button>
+                  <button type="button" class="scale-chip" data-scale="10000">1:10.000</button>
+                  <button type="button" class="scale-chip is-active" data-scale="25000">1:25.000</button>
+                  <button type="button" class="scale-chip" data-scale="50000">1:50.000</button>
+                  <button type="button" class="scale-chip" data-scale="100000">1:100.000</button>
+                </div>
+                <div class="field field-tight" id="kop-scale-custom-wrap">
+                  <span>Angka Skala 1 :</span>
+                  <div style="display: flex; gap: 6px; align-items: center;">
+                    <input id="kop-scale-custom" type="number" placeholder="mis. 25000" value="25000" style="flex: 1 1 auto;">
+                    <button type="button" id="btn-apply-scale" class="btn btn-secondary btn-sm" style="flex: none; white-space: nowrap;">Terapkan ke Zoom</button>
+                  </div>
+                  <p class="hint hint-tight">Menyesuaikan zoom peta otomatis agar presisi dengan skala bulat ini.</p>
+                </div>
+              </div>
             </div>
-            <label class="field field-tight">
-              <span>Jabatan Penanggung Jawab / Pimpinan</span>
-              <input id="kop-supervisorTitle" type="text" placeholder="mis. Kepala Seksi Perencanaan / Project Manager / Pembina" maxlength="90">
-            </label>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Nama pembuat peta</span>
-                <input id="kop-mapmakerName" type="text" placeholder="mis. Rahmat Hidayat / Tim Pemetaan" maxlength="90">
-              </label>
-              <label class="field field-tight">
-                <span>Gelar / Kualifikasi</span>
-                <input id="kop-mapmakerDegree" type="text" placeholder="mis. S.T. / Ahli SIG" maxlength="30">
-              </label>
-            </div>
-            <label class="field field-tight">
-              <span>Identitas Pembuat (Nama Singkat)</span>
-              <input id="layout-author" type="text" placeholder="mis. Tim Surveyor Lapangan" maxlength="60">
-            </label>
-          </div>
 
-          <!-- 7. Diagram Lokasi (Inset) -->
-          <div class="kop-subgroup" data-blok-section="inset">
-            <div class="kop-subgroup-title">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
-              <span>Diagram Lokasi (Inset)</span>
+            <!-- 4. Sistem Koordinat & Proyeksi -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="ref" id="kop-acc-ref">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="ref">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <span class="kop-acc-title">Sistem Koordinat &amp; Grid</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-ref">UTM 52S</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <div class="kop-grid">
+                  <label class="field field-tight">
+                    <span>Proyeksi</span>
+                    <input id="kop-projection" type="text" value="Universal Transverse Mercator" maxlength="60">
+                  </label>
+                  <label class="field field-tight">
+                    <span>Zona</span>
+                    <input id="kop-zone" type="text" value="UTM 52S" maxlength="30">
+                  </label>
+                </div>
+                <label class="field field-tight">
+                  <span>Datum</span>
+                  <input id="kop-datum" type="text" value="WGS 1984" maxlength="40">
+                </label>
+                <label class="field field-tight">
+                  <span>Posisi teks grid koordinat</span>
+                  <select id="kop-grid-pos">
+                    <option value="outside" selected>Di luar peta (margin frame)</option>
+                    <option value="inside">Di dalam peta (penuh)</option>
+                  </select>
+                </label>
+              </div>
             </div>
-            <label class="field field-tight">
-              <span>Peta dasar inset</span>
-              <select id="kop-inset-basemap">
-                <option value="streets" selected>Peta Jalan</option>
-                <option value="terrain">Relief</option>
-                <option value="satellite">Satelit</option>
-                <option value="topo">Topografi</option>
-                <option value="follow">Sama dengan peta utama</option>
-              </select>
-            </label>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Perbesaran inset</span>
-                <select id="kop-inset-zoom">
-                  <option value="2">Sangat luas (negara)</option>
-                  <option value="4" selected>Luas (provinsi)</option>
-                  <option value="6">Sedang</option>
-                  <option value="8">Dekat (kabupaten)</option>
-                </select>
-              </label>
-              <label class="field field-tight">
-                <span>Tinggi inset</span>
-                <select id="kop-inset-height">
-                  <option value="110">Pendek</option>
-                  <option value="150" selected>Sedang</option>
-                  <option value="200">Tinggi</option>
-                </select>
-              </label>
+
+            <!-- Legenda -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="legend" id="kop-acc-legend">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="legend">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                  <span class="kop-acc-title">Legenda Peta</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-legend">Ukuran aktif</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="toggle toggle-inline">
+                  <input type="checkbox" id="kop-legend-show-measure" checked>
+                  <span>Tampilkan total luas / panjang di legenda</span>
+                </label>
+                <p class="hint hint-tight">Otomatis menghitung luas poligon (ha/m²) atau panjang garis (km) pada tiap kategori legenda.</p>
+              </div>
             </div>
-            <div class="kop-grid">
-              <label class="field field-tight">
-                <span>Warna kotak cakupan</span>
-                <input type="color" id="kop-inset-color" value="#e01b1b" class="inset-color">
-              </label>
-              <label class="field field-tight">
-                <span>Garis batas inset</span>
-                <select id="kop-inset-grid">
-                  <option value="1" selected>Tampilkan grid</option>
-                  <option value="0">Tanpa grid</option>
-                </select>
-              </label>
+
+            <!-- 5. Sumber Data -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="source" id="kop-acc-source">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="source">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                  <span class="kop-acc-title">Sumber Data &amp; Referensi</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-source">Bawaan</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="field field-tight">
+                  <span>Sumber data</span>
+                  <textarea id="kop-sourceData" rows="2" placeholder="mis. Citra Satelit Resolusi Tinggi; OpenStreetMap; Survei Lapangan 2024" maxlength="400"></textarea>
+                </label>
+              </div>
             </div>
-            <label class="field field-tight">
-              <span>Judul diagram lokasi</span>
-              <input id="kop-inset-label" type="text" value="Diagram Lokasi:" maxlength="40">
-            </label>
+
+            <!-- 6. Pengesahan / Pembuat Peta -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="sign" id="kop-acc-sign">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="sign">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <span class="kop-acc-title">Pengesahan &amp; Pembuat Peta</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-sign"></span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="field field-tight">
+                  <span>Jabatan Penanggung Jawab / Pimpinan</span>
+                  <input id="kop-supervisorTitle" type="text" placeholder="mis. Kepala Seksi Perencanaan / Project Manager / Pembina" maxlength="90">
+                </label>
+                <div class="kop-grid">
+                  <label class="field field-tight">
+                    <span>Nama pembuat peta</span>
+                    <input id="kop-mapmakerName" type="text" placeholder="mis. Rahmat Hidayat / Tim Pemetaan" maxlength="90">
+                  </label>
+                  <label class="field field-tight">
+                    <span>Gelar / Kualifikasi</span>
+                    <input id="kop-mapmakerDegree" type="text" placeholder="mis. S.T. / Ahli SIG" maxlength="30">
+                  </label>
+                </div>
+                <label class="field field-tight">
+                  <span>Identitas Pembuat (Nama Singkat)</span>
+                  <input id="layout-author" type="text" placeholder="mis. Tim Surveyor Lapangan" maxlength="60">
+                </label>
+              </div>
+            </div>
+
+            <!-- 7. Diagram Lokasi (Inset) -->
+            <div class="kop-accordion-card kop-subgroup" data-blok-section="inset" id="kop-acc-inset">
+              <button type="button" class="kop-accordion-header" aria-expanded="false" data-acc-target="inset">
+                <div class="kop-acc-header-left">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                  <span class="kop-acc-title">Diagram Lokasi (Inset)</span>
+                </div>
+                <div class="kop-acc-header-right">
+                  <span class="kop-acc-badge" id="acc-badge-inset">Peta Jalan · Zoom 4</span>
+                  <svg class="kop-acc-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+              </button>
+              <div class="kop-accordion-body">
+                <label class="field field-tight">
+                  <span>Peta dasar inset</span>
+                  <select id="kop-inset-basemap">
+                    <option value="streets" selected>Peta Jalan</option>
+                    <option value="terrain">Relief</option>
+                    <option value="satellite">Satelit</option>
+                    <option value="topo">Topografi</option>
+                    <option value="follow">Sama dengan peta utama</option>
+                  </select>
+                </label>
+                <div class="kop-grid">
+                  <label class="field field-tight">
+                    <span>Perbesaran inset</span>
+                    <select id="kop-inset-zoom">
+                      <option value="2">Sangat luas (negara)</option>
+                      <option value="4" selected>Luas (provinsi)</option>
+                      <option value="6">Sedang</option>
+                      <option value="8">Dekat (kabupaten)</option>
+                    </select>
+                  </label>
+                  <label class="field field-tight">
+                    <span>Tinggi inset</span>
+                    <select id="kop-inset-height">
+                      <option value="110">Pendek</option>
+                      <option value="150" selected>Sedang</option>
+                      <option value="200">Tinggi</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="kop-grid">
+                  <label class="field field-tight">
+                    <span>Warna kotak cakupan</span>
+                    <input type="color" id="kop-inset-color" value="#e01b1b" class="inset-color">
+                  </label>
+                  <label class="field field-tight">
+                    <span>Garis batas inset</span>
+                    <select id="kop-inset-grid">
+                      <option value="1" selected>Tampilkan grid</option>
+                      <option value="0">Tanpa grid</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="field field-tight">
+                  <span>Judul diagram lokasi</span>
+                  <input id="kop-inset-label" type="text" value="Diagram Lokasi:" maxlength="40">
+                </label>
+              </div>
+            </div>
           </div>
         </div>
         <button id="btn-paper-preview" class="btn btn-primary paper-open">Layout siap cetak</button>

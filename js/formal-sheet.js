@@ -215,6 +215,18 @@ const FormalSheet = (function () {
     bSign.appendChild(sign);
     panel.appendChild(bSign);
 
+    // Klik blok lembar peta -> buka bagian accordion terkait di sidebar
+    panel.addEventListener('click', (e) => {
+      const blk = e.target.closest('.fl-block');
+      if (!blk) return;
+      const m = blk.className.match(/\bfl-blk-([a-z0-9_-]+)\b/);
+      if (m && m[1]) {
+        if (typeof window.bukaBagianKop === 'function') {
+          window.bukaBagianKop(m[1]);
+        }
+      }
+    });
+
     sheet.appendChild(mapCol);
     sheet.appendChild(panel);
 
@@ -232,6 +244,8 @@ const FormalSheet = (function () {
     mapHost.appendChild(mapEl);
     mapEl.classList.add('fl-map-inside');
     installed = true;
+    applyPanelPosition();
+    applyFontFamily();
 
     // Peta berubah ukuran -> gambar ulang.
     setTimeout(() => { try { map.invalidateSize(); } catch (e) {} refresh(); }, 60);
@@ -961,9 +975,49 @@ const FormalSheet = (function () {
     }
   }
 
+  /* -------------------- Posisi Kop (Kanan, Kiri, Bawah, Atas) --------- */
+  function applyPanelPosition() {
+    if (!sheet) return;
+    const k = kop();
+    const pos = (k.panelPosition || 'right').toLowerCase();
+    const valid = ['right', 'left', 'bottom', 'top'];
+    const activePos = valid.includes(pos) ? pos : 'right';
+
+    const prevPos = sheet.dataset.pos || '';
+    if (prevPos !== activePos || !sheet.classList.contains('fl-pos-' + activePos)) {
+      sheet.dataset.pos = activePos;
+      sheet.classList.remove('fl-pos-right', 'fl-pos-left', 'fl-pos-bottom', 'fl-pos-top');
+      sheet.classList.add('fl-pos-' + activePos);
+      if (typeof map !== 'undefined' && map && map.invalidateSize) {
+        setTimeout(() => {
+          try { map.invalidateSize(); } catch (e) {}
+          refreshGraticule();
+        }, 50);
+      }
+    }
+  }
+
+  /* -------------------- Tipografi Kop (Serif, Sans, Mono, Humanist) --- */
+  function applyFontFamily() {
+    if (!sheet) return;
+    const k = kop();
+    const font = (k.fontFamily || 'serif').toLowerCase();
+    const valid = ['serif', 'sans', 'mono', 'humanist'];
+    const activeFont = valid.includes(font) ? font : 'serif';
+
+    const prevFont = sheet.dataset.font || '';
+    if (prevFont !== activeFont || !sheet.classList.contains('fl-font-' + activeFont)) {
+      sheet.dataset.font = activeFont;
+      sheet.classList.remove('fl-font-serif', 'fl-font-sans', 'fl-font-mono', 'fl-font-humanist');
+      sheet.classList.add('fl-font-' + activeFont);
+    }
+  }
+
   /* -------------------- Penyegaran menyeluruh -------------------- */
   function refresh() {
     if (!installed) return;
+    applyPanelPosition();
+    applyFontFamily();
     syncCustomBlocks();
     applyBlokOrder();
     applyInsetPrefs();

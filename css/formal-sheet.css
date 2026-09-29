@@ -39,9 +39,106 @@
   grid-template-rows: 1fr;
   gap: 8px;
   padding: 8px;
-  color: #111111;
-  font-family: "Times New Roman", Georgia, serif;
+  --fl-font: "Times New Roman", Georgia, serif;
+  font-family: var(--fl-font);
   box-sizing: border-box;
+}
+
+/* Variasi tipografi lembar formal */
+.formal-sheet.fl-font-serif {
+  --fl-font: "Times New Roman", Georgia, serif;
+}
+.formal-sheet.fl-font-sans {
+  --fl-font: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+.formal-sheet.fl-font-mono {
+  --fl-font: "SF Mono", "Roboto Mono", Consolas, "Courier New", monospace;
+}
+.formal-sheet.fl-font-humanist {
+  --fl-font: "Trebuchet MS", "Lucida Sans", "Segoe UI", sans-serif;
+}
+
+/* Variasi posisi panel kop di desktop (Kanan, Kiri, Bawah, Atas) */
+@media screen and (min-width: 901px) {
+  .formal-sheet,
+  .formal-sheet.fl-pos-right {
+    grid-template-columns: 1fr 300px;
+    grid-template-rows: 1fr;
+  }
+  .formal-sheet.fl-pos-right .fl-map-col { order: 1; }
+  .formal-sheet.fl-pos-right .fl-panel { order: 2; flex-direction: column; }
+
+  .formal-sheet.fl-pos-left {
+    grid-template-columns: 300px 1fr;
+    grid-template-rows: 1fr;
+  }
+  .formal-sheet.fl-pos-left .fl-panel { order: 1; flex-direction: column; }
+  .formal-sheet.fl-pos-left .fl-map-col { order: 2; }
+
+  .formal-sheet.fl-pos-bottom {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .formal-sheet.fl-pos-bottom .fl-map-col { order: 1; min-height: 0; }
+  .formal-sheet.fl-pos-bottom .fl-panel {
+    order: 2;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 185px;
+    max-height: 230px;
+    width: 100%;
+  }
+
+  .formal-sheet.fl-pos-top {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .formal-sheet.fl-pos-top .fl-panel {
+    order: 1;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 185px;
+    max-height: 230px;
+    width: 100%;
+  }
+  .formal-sheet.fl-pos-top .fl-map-col { order: 2; min-height: 0; }
+
+  /* Penyesuaian blok dalam posisi mendatar (Bawah & Atas) */
+  .formal-sheet.fl-pos-bottom .fl-block,
+  .formal-sheet.fl-pos-top .fl-block {
+    border-bottom: 0;
+    border-right: 1.2px solid #111111;
+    flex: 0 0 auto;
+    min-width: 150px;
+    max-width: 320px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    overflow-y: auto;
+    box-sizing: border-box;
+  }
+  .formal-sheet.fl-pos-bottom .fl-block:last-child,
+  .formal-sheet.fl-pos-top .fl-block:last-child {
+    border-right: 0;
+  }
+  .formal-sheet.fl-pos-bottom .fl-block--grow,
+  .formal-sheet.fl-pos-top .fl-block--grow {
+    flex: 1 1 180px;
+    min-width: 180px;
+  }
+  .formal-sheet.fl-pos-bottom .fl-block--sign:last-child,
+  .formal-sheet.fl-pos-top .fl-block--sign:last-child {
+    margin-top: 0;
+    margin-left: auto;
+  }
+  .formal-sheet.fl-pos-bottom .fl-inset-wrap,
+  .formal-sheet.fl-pos-top .fl-inset-wrap {
+    width: 130px;
+    height: 105px;
+  }
 }
 
 #map-wrap:not(.tpl-formal) .formal-sheet { display: none; }
@@ -98,7 +195,7 @@
   z-index: var(--z-graticule);
   max-width: 100%;
   padding: 2px 5px;
-  font-family: "Times New Roman", Georgia, serif;
+  font-family: var(--fl-font);
   font-size: 8.5px;
   line-height: 1.3;
   color: #111;
@@ -387,14 +484,19 @@
 
 /* ---------- Responsif: panel turun ke bawah ---------- */
 @media screen and (max-width: 900px) {
-  .formal-sheet {
+  .formal-sheet,
+  .formal-sheet.fl-pos-right,
+  .formal-sheet.fl-pos-left,
+  .formal-sheet.fl-pos-bottom,
+  .formal-sheet.fl-pos-top {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(240px, 1fr) auto;
     height: auto;
   }
-  .fl-map-col { border-right: 0; border-bottom: 1.6px solid #111; min-height: 300px; }
-  .fl-panel { max-height: none; }
-  .fl-inset-wrap { height: 130px; }
+  .fl-map-col { order: 1 !important; border-right: 0; border-bottom: 1.6px solid #111; min-height: 300px; }
+  .fl-panel { order: 2 !important; max-height: none; flex-direction: column !important; width: 100% !important; height: auto !important; }
+  .fl-panel .fl-block { border-right: 0 !important; border-bottom: 1.2px solid #111 !important; width: 100% !important; max-width: none !important; }
+  .fl-inset-wrap { height: 130px; width: 100% !important; }
 }
 
 /* Blok kustom tambahan */
@@ -429,7 +531,8 @@
     overflow: visible;
   }
 
-  .formal-sheet {
+  .formal-sheet,
+  .formal-sheet.fl-pos-right {
     border-width: 1.4px;
     /* Ganti 100vh -> 100% agar mengikuti halaman, bukan viewport. */
     height: 100%;
@@ -437,6 +540,62 @@
        di halaman sempit (A4 tegak/Letter). Dengan 300px tetap, peta
        menyusut jadi 62%; dengan min() proporsi kembali ~73%. */
     grid-template-columns: 1fr min(300px, 27%);
+    grid-template-rows: 1fr;
+  }
+  .formal-sheet.fl-pos-right .fl-map-col { order: 1; }
+  .formal-sheet.fl-pos-right .fl-panel { order: 2; flex-direction: column; }
+
+  .formal-sheet.fl-pos-left {
+    border-width: 1.4px;
+    height: 100%;
+    grid-template-columns: min(300px, 27%) 1fr;
+    grid-template-rows: 1fr;
+  }
+  .formal-sheet.fl-pos-left .fl-panel { order: 1; flex-direction: column; }
+  .formal-sheet.fl-pos-left .fl-map-col { order: 2; }
+
+  .formal-sheet.fl-pos-bottom {
+    border-width: 1.4px;
+    height: 100%;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+  .formal-sheet.fl-pos-bottom .fl-map-col { order: 1; min-height: 0; }
+  .formal-sheet.fl-pos-bottom .fl-panel {
+    order: 2;
+    flex-direction: row;
+    height: auto;
+    max-height: 25%;
+    width: 100%;
+  }
+
+  .formal-sheet.fl-pos-top {
+    border-width: 1.4px;
+    height: 100%;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .formal-sheet.fl-pos-top .fl-panel {
+    order: 1;
+    flex-direction: row;
+    height: auto;
+    max-height: 25%;
+    width: 100%;
+  }
+  .formal-sheet.fl-pos-top .fl-map-col { order: 2; min-height: 0; }
+
+  .formal-sheet.fl-pos-bottom .fl-block,
+  .formal-sheet.fl-pos-top .fl-block {
+    border-bottom: 0;
+    border-right: 1.2px solid #111111;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .formal-sheet.fl-pos-bottom .fl-block:last-child,
+  .formal-sheet.fl-pos-top .fl-block:last-child {
+    border-right: 0;
   }
 
   /* Warna harus ikut tercetak (background grafis dimatikan browser default) */

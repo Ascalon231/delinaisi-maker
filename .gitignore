@@ -9,6 +9,8 @@ test-results/
 npm-debug.log*
 *.log
 
-# Sistem
+# Sistem & Agent
 .DS_Store
 Thumbs.db
+.agents/
+
