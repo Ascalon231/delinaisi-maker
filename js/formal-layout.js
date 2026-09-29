@@ -117,26 +117,43 @@ const FormalLayout = (function () {
 
   /* -------------------- Graticule ke canvas -------------------- */
   // Menggambar grid lintang/bujur pada kanvas berukuran `size`,
-  // beserta label DMS di margin luar frame.
+  // beserta label DMS di margin luar frame atau di dalam area peta.
   function drawGraticule(ctx, map, size, opts) {
     opts = opts || {};
-    const margin = opts.margin != null ? opts.margin : 0;
-    // Langkah bisa dipaksa (dipakai inset yang perlu grid lebih jarang),
-    // atau dihitung dari zoom peta.
     const step = opts.step != null ? opts.step : intervalFor(map.getZoom());
     const fontSize = opts.fontSize || 10;
     const showEdgeLabels = opts.showEdgeLabels !== false;
+    const labelPos = opts.labelPosition || 'outside';
+    const isInside = labelPos === 'inside';
 
-    // Area gambar peta. Sebuah inset kecil dipakai supaya garis grid tidak
-    // menyentuh tepi kanvas: saat diekspor ke PNG, garis yang menempel tepi
-    // terlihat seperti terpotong. Label duduk di dalam inset ini.
-    const PAD = opts.pad != null ? opts.pad : 12;
-    const x0 = margin + PAD, y0 = margin + PAD;
-    const x1 = size.x - margin - PAD, y1 = size.y - margin - PAD;
+    let mL = 0, mR = 0, mT = 0, mB = 0;
+    if (!isInside && opts.margin) {
+      if (typeof opts.margin === 'object') {
+        mL = opts.margin.left || 0;
+        mR = opts.margin.right || 0;
+        mT = opts.margin.top || 0;
+        mB = opts.margin.bottom || 0;
+      } else {
+        mL = mR = mT = mB = Number(opts.margin) || 0;
+      }
+    }
 
-    // Batas geografis dari sudut area peta
-    const nw = map.containerPointToLatLng([x0, y0]);
-    const se = map.containerPointToLatLng([x1, y1]);
+    // Jika mode outside tapi margin 0 (mis. inset), pakai pad standar 12px
+    if (!isInside && mL === 0 && mR === 0 && mT === 0 && mB === 0) {
+      const pad = opts.pad != null ? opts.pad : 12;
+      mL = mR = mT = mB = pad;
+    }
+
+    const x0 = isInside ? 2 : mL;
+    const y0 = isInside ? 2 : mT;
+    const x1 = isInside ? size.x - 2 : size.x - mR;
+    const y1 = isInside ? size.y - 2 : size.y - mB;
+
+    // Batas geografis dari sudut area peta aktif
+    const mapW = isInside ? size.x : Math.max(10, size.x - mL - mR);
+    const mapH = isInside ? size.y : Math.max(10, size.y - mT - mB);
+    const nw = map.containerPointToLatLng([0, 0]);
+    const se = map.containerPointToLatLng([mapW, mapH]);
 
     const latTop = nw.lat, latBot = se.lat;
     const lngLeft = nw.lng, lngRight = se.lng;
@@ -148,11 +165,28 @@ const FormalLayout = (function () {
     ctx.strokeStyle = opts.color || 'rgba(20,20,20,.55)';
     ctx.fillStyle = opts.fontColor || '#1a1a1a';
 
+    function drawLabel(text, x, y, align, isInner) {
+      ctx.textAlign = align;
+      if (isInner) {
+        ctx.save();
+        ctx.lineJoin = 'round';
+        ctx.miterLimit = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.lineWidth = 3.5;
+        ctx.strokeText(text, x, y);
+        ctx.fillStyle = opts.fontColor || '#111111';
+        ctx.fillText(text, x, y);
+        ctx.restore();
+      } else {
+        ctx.fillText(text, x, y);
+      }
+    }
+
     // --- Garis lintang (horizontal) ---
     const firstLat = Math.ceil(latBot / step) * step;
     for (let lat = firstLat; lat <= latTop; lat += step) {
       const p = map.latLngToContainerPoint(L.latLng(lat, lngLeft));
-      const y = p.y;
+      const y = isInside ? p.y : (p.y + mT);
       if (y < y0 || y > y1) continue;
 
       ctx.beginPath();
@@ -163,25 +197,31 @@ const FormalLayout = (function () {
       const label = toDMS(lat, true);
       if (showEdgeLabels) {
         const tw = ctx.measureText(label).width;
-        // Label diletakkan di dalam inset (bukan menempel tepi kanvas),
-        // lalu tetap dijepit agar tidak terpotong saat ekspor PNG.
-        const pad = Math.max(2, Math.round((PAD - tw) / 2) + (margin > 0 ? margin : 0));
-        const leftX = pad;
-        const rightX = Math.max(leftX, size.x - pad);
-        ctx.textAlign = 'left';
-        ctx.fillText(label, clampLabel(leftX, tw, 'left', size.x, 2), y);
-        ctx.textAlign = 'right';
-        ctx.fillText(label, clampLabel(rightX, tw, 'right', size.x, 2), y);
+        if (isInside) {
+          const leftX = 8;
+          const rightX = size.x - 8;
+          const textY = Math.max(14, Math.min(size.y - 14, y - 4));
+          drawLabel(label, leftX, textY, 'left', true);
+          drawLabel(label, rightX, textY, 'right', true);
+        } else {
+          // Garis centang kecil (tick mark) di antara margin
+          ctx.beginPath();
+          ctx.moveTo(Math.max(2, x0 - 4), y); ctx.lineTo(x0, y);
+          ctx.moveTo(x1, y); ctx.lineTo(Math.min(size.x - 2, x1 + 4), y);
+          ctx.stroke();
+
+          // Label di margin kiri & kanan (bersih di atas latar kertas putih)
+          drawLabel(label, Math.max(3, x0 - 6), y, 'right', false);
+          drawLabel(label, Math.min(size.x - 3, x1 + 6), y, 'left', false);
+        }
       }
     }
 
     // --- Garis bujur (vertikal) ---
-    // Toleransi 0 (bukan ±1) supaya garis tidak pernah menyentuh tepi kanvas:
-    // garis yang menempel tepi akan terlihat terpotong saat diekspor PNG.
     const firstLng = Math.ceil(lngLeft / step) * step;
     for (let lng = firstLng; lng <= lngRight; lng += step) {
       const p = map.latLngToContainerPoint(L.latLng(latTop, lng));
-      const x = p.x;
+      const x = isInside ? p.x : (p.x + mL);
       if (x < x0 || x > x1) continue;
 
       ctx.beginPath();
@@ -192,13 +232,25 @@ const FormalLayout = (function () {
       const label = toDMS(lng, false);
       if (showEdgeLabels) {
         const tw = ctx.measureText(label).width;
-        ctx.textAlign = 'center';
-        // Label atas & bawah dijepit horizontal agar tidak keluar kanvas.
-        const cx = clampLabel(x, tw, 'center', size.x);
-        const cyTop = margin > 16 ? 8 : Math.max(8, y0 - 4);
-        const cyBot = margin > 16 ? size.y - 8 : Math.min(size.y - 8, y1 + 10);
-        ctx.fillText(label, cx, cyTop);
-        ctx.fillText(label, cx, cyBot);
+        if (isInside) {
+          const cx = clampLabel(x, tw, 'center', size.x, 8);
+          const cyTop = 14;
+          const cyBot = size.y - 10;
+          drawLabel(label, cx, cyTop, 'center', true);
+          drawLabel(label, cx, cyBot, 'center', true);
+        } else {
+          // Garis centang kecil (tick mark) di antara margin
+          ctx.beginPath();
+          ctx.moveTo(x, Math.max(2, y0 - 4)); ctx.lineTo(x, y0);
+          ctx.moveTo(x, y1); ctx.lineTo(x, Math.min(size.y - 2, y1 + 4));
+          ctx.stroke();
+
+          const cx = clampLabel(x, tw, 'center', size.x, 6);
+          const cyTop = Math.round(mT / 2) + 1;
+          const cyBot = Math.round(size.y - mB / 2);
+          drawLabel(label, cx, cyTop, 'center', false);
+          drawLabel(label, cx, cyBot, 'center', false);
+        }
       }
     }
 
@@ -316,18 +368,75 @@ const FormalLayout = (function () {
   }
 
   /* -------------------- Ikon mata angin -------------------- */
-  function buildCompass() {
+  /* -------------------- Ikon mata angin (beragam varian kartografi) -------------------- */
+  function buildCompass(style, letter) {
+    const s = style || 'classic';
+    const l = (letter || 'U').toUpperCase();
     const wrap = document.createElement('div');
-    wrap.className = 'fl-compass';
+    wrap.className = 'fl-compass fl-compass--' + s;
     wrap.setAttribute('aria-label', 'Arah utara');
-    wrap.innerHTML =
-      '<svg viewBox="0 0 40 40" width="40" height="40">' +
+
+    let svgInner = '';
+    if (s === 'triangle') {
+      svgInner =
+        '<text x="20" y="7.5" text-anchor="middle" font-size="8.5" font-family="sans-serif" font-weight="800" fill="#111">' + l + '</text>' +
+        '<polygon points="20,10 14,35 20,31" fill="#111"/>' +
+        '<polygon points="20,10 26,35 20,31" fill="#fff" stroke="#111" stroke-width="0.8"/>' +
+        '<line x1="20" y1="10" x2="20" y2="35" stroke="#111" stroke-width="0.6"/>';
+    } else if (s === 'modern') {
+      svgInner =
+        '<text x="20" y="7" text-anchor="middle" font-size="8.5" font-family="sans-serif" font-weight="800" fill="#111">' + l + '</text>' +
+        '<path d="M20 10 L20 37" stroke="#111" stroke-width="1.6" stroke-linecap="round"/>' +
+        '<polygon points="20,8 14,20 20,17.5" fill="#111"/>' +
+        '<polygon points="20,8 26,20 20,17.5" fill="#fff" stroke="#111" stroke-width="0.8"/>';
+    } else if (s === 'star') {
+      svgInner =
+        '<circle cx="20" cy="20" r="18" fill="none" stroke="#111" stroke-width="0.8"/>' +
+        '<polygon points="20,20 12,12 20,16" fill="#111"/>' +
+        '<polygon points="20,20 12,12 16,20" fill="#fff" stroke="#111" stroke-width="0.5"/>' +
+        '<polygon points="20,20 28,12 20,16" fill="#fff" stroke="#111" stroke-width="0.5"/>' +
+        '<polygon points="20,20 28,12 24,20" fill="#111"/>' +
+        '<polygon points="20,20 12,28 16,20" fill="#111"/>' +
+        '<polygon points="20,20 12,28 20,24" fill="#fff" stroke="#111" stroke-width="0.5"/>' +
+        '<polygon points="20,20 28,28 24,20" fill="#fff" stroke="#111" stroke-width="0.5"/>' +
+        '<polygon points="20,20 28,28 20,24" fill="#111"/>' +
+        '<polygon points="20,20 20,4 17,20" fill="#111"/>' +
+        '<polygon points="20,20 20,4 23,20" fill="#fff" stroke="#111" stroke-width="0.6"/>' +
+        '<polygon points="20,20 20,36 17,20" fill="#fff" stroke="#111" stroke-width="0.6"/>' +
+        '<polygon points="20,20 20,36 23,20" fill="#111"/>' +
+        '<polygon points="20,20 4,20 20,17" fill="#fff" stroke="#111" stroke-width="0.6"/>' +
+        '<polygon points="20,20 4,20 20,23" fill="#111"/>' +
+        '<polygon points="20,20 36,20 20,17" fill="#111"/>' +
+        '<polygon points="20,20 36,20 20,23" fill="#fff" stroke="#111" stroke-width="0.6"/>' +
+        '<circle cx="20" cy="20" r="2" fill="#111"/>' +
+        '<text x="20" y="3.5" text-anchor="middle" font-size="6.5" font-family="sans-serif" font-weight="800" fill="#111">' + l + '</text>';
+    } else if (s === 'survey') {
+      svgInner =
+        '<text x="20" y="8" text-anchor="middle" font-size="8.5" font-family="\'Times New Roman\', serif" font-weight="700" fill="#111">' + l + '</text>' +
+        '<path d="M20 9 L20 36" stroke="#111" stroke-width="1.2"/>' +
+        '<polygon points="20,10 13,26 20,23" fill="#111"/>' +
+        '<polygon points="20,10 27,26 20,23" fill="#fff" stroke="#111" stroke-width="0.8"/>' +
+        '<line x1="10" y1="26" x2="30" y2="26" stroke="#111" stroke-width="1"/>' +
+        '<circle cx="20" cy="34" r="1.5" fill="#111"/>';
+    } else {
+      // 'classic' default
+      svgInner =
         '<circle cx="20" cy="20" r="18" fill="none" stroke="#111" stroke-width="0.8"/>' +
         '<path d="M20 4 L24.5 20 L20 17.6 L15.5 20 Z" fill="#111"/>' +
         '<path d="M20 36 L15.5 20 L20 22.4 L24.5 20 Z" fill="#fff" stroke="#111" stroke-width="0.7"/>' +
-        '<text x="20" y="12.6" text-anchor="middle" font-size="7.5" font-family="sans-serif" font-weight="700" fill="#111">N</text>' +
-      '</svg>';
+        '<text x="20" y="12.6" text-anchor="middle" font-size="7.5" font-family="sans-serif" font-weight="700" fill="#fff">' + l + '</text>';
+    }
+
+    wrap.innerHTML = '<svg viewBox="0 0 40 40" width="40" height="40">' + svgInner + '</svg>';
     return wrap;
+  }
+
+  function zoomForScale(rf, lat) {
+    if (!rf || rf <= 0) return 10;
+    const rad = ((lat != null ? lat : 0) * Math.PI) / 180;
+    const metersPerPx = (rf * 0.0254) / 96;
+    const z = Math.log2((156543.03392 * Math.cos(rad)) / metersPerPx);
+    return Math.max(1, Math.min(19, z));
   }
 
   return {
@@ -338,6 +447,7 @@ const FormalLayout = (function () {
     drawGraticule: drawGraticule,
     buildScaleBar: buildScaleBar,
     representativeFraction: representativeFraction,
+    zoomForScale: zoomForScale,
     buildCompass: buildCompass,
     fmtNumber: fmtNumber
   };

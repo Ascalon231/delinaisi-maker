@@ -47,11 +47,11 @@ Gratis, tanpa login, tanpa server — semuanya berjalan di browser.
     otomatis diperkecil & disimpan di browser, jadi kop memakai logo
     kampus/instansi asli, bukan ikon bawaan
   - Semua teks berasal dari input user (generik, bisa untuk topik apa pun)
-- **8 peta dasar, semuanya gratis & tanpa API key**: Peta Jalan (OpenStreetMap),
+- **5 peta dasar, semuanya gratis & tanpa API key**: Peta Jalan (OpenStreetMap),
   Satelit (Esri), **Relief** (Esri Topo — bentuk lahan), **Topografi**
-  (OpenTopoMap — kontur & puncak), Minimal & Voyager & Gelap (CARTO), serta
-  **Kosong** (tanpa peta dasar). Sengaja tidak memakai penyedia ber-API key
-  seperti Stadia/Mapbox/Thunderforest agar tidak gagal di komputer pengguna.
+  (OpenTopoMap — kontur & puncak), serta **Kosong** (tanpa peta dasar).
+  Sengaja tidak memakai penyedia ber-API key seperti Stadia/Mapbox/Thunderforest
+  agar tidak gagal di komputer pengguna.
 - **Cari lokasi** ketik nama tempat/kota/kampus (Nominatim)
 - **Batas administrasi** sebagai lapisan terpisah (tidak bercampur dengan
   delinasi Anda): cari provinsi / kabupaten-kota / kecamatan / kelurahan-desa,

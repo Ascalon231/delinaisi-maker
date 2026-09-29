@@ -124,7 +124,7 @@ test('undo: fitur yang dihapus bisa dipulihkan', async ({ page }) => {
   await page.waitForTimeout(2000);
 
   await page.locator('.tool[data-tool="Marker"]').click();
-  await page.locator('#map').click({ position: { x: 600, y: 300 } });
+  await page.locator('#map').click({ position: { x: 350, y: 250 } });
   await page.locator('#attr-name').fill('Marker Uji');
   await page.locator('#attr-save').click();
   await page.waitForTimeout(300);
@@ -209,7 +209,7 @@ test('alat titik membuat marker dengan koordinat', async ({ page }) => {
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
 
   await page.locator('.tool[data-tool="Marker"]').click();
-  await page.locator('#map').click({ position: { x: 600, y: 300 } });
+  await page.locator('#map').click({ position: { x: 350, y: 250 } });
   await page.waitForTimeout(300);
 
   await expect(page.locator('#modal-overlay')).not.toHaveClass(/hidden/);
@@ -227,9 +227,9 @@ test('ganti peta dasar aktif tanpa error', async ({ page }) => {
   await page.waitForTimeout(500);
   await expect(page.locator('[data-basemap="satellite"]')).toHaveClass(/active/);
 
-  await page.locator('[data-basemap="light"]').click();
+  await page.locator('[data-basemap="terrain"]').click();
   await page.waitForTimeout(500);
-  await expect(page.locator('[data-basemap="light"]')).toHaveClass(/active/);
+  await expect(page.locator('[data-basemap="terrain"]')).toHaveClass(/active/);
 
   expect(errors).toEqual([]);
 });
@@ -247,7 +247,7 @@ test('layout: judul, legenda & sumber data tampil di lembar Kop Akademik', async
 
   // Buat satu fitur -> legenda lembar menampilkan kategori tsb
   await page.locator('.tool[data-tool="Marker"]').click();
-  await page.locator('#map').click({ position: { x: 600, y: 300 } });
+  await page.locator('#map').click({ position: { x: 350, y: 250 } });
   await page.waitForTimeout(400);
   await page.locator('#attr-name').fill('Titik Pantau');
   await page.locator('#attr-save').click();
@@ -829,7 +829,7 @@ test('peta dasar: semua pilihan tanpa API key & benar-benar memuat ubin', async 
 
   // Tidak ada URL ubin yang menyisipkan kunci/token.
   const urls = await page.evaluate(() => Object.keys(BASEMAPS).map(k => BASEMAPS[k]._url || ''));
-  expect(urls.length).toBeGreaterThanOrEqual(8);
+  expect(urls.length).toBeGreaterThanOrEqual(5);
   urls.forEach(u => {
     expect(u).not.toMatch(/api[_-]?key|access[_-]?token|apikey|\{key\}|apikey=/i);
   });
@@ -1487,7 +1487,8 @@ test('inset: setiap kontrol terpasang ke state (id tidak mismatch)', async ({ pa
     ['#kop-inset-zoom',    '8',         'insetZoom'],
     ['#kop-inset-height',  '200',       'insetHeight'],
     ['#kop-inset-grid',    '0',         'insetGrid'],
-    ['#kop-programStudy',  'PWK',       'programStudy']
+    ['#kop-programStudy',  'PWK',       'programStudy'],
+    ['#kop-grid-pos',      'inside',    'gridPos']
   ];
   for (const [sel, val, key] of cases) {
     await page.locator(sel).selectOption(val).catch(async () => {
@@ -1618,17 +1619,57 @@ test('inset: mode "sama dengan peta utama" ikut berubah saat peta dasar diganti'
   expect(u.inset).toBe(u.utama);
   expect(u.inset).toContain('World_Topo_Map');
 
-  await page.locator('[data-basemap="dark"]').click();
+  await page.locator('[data-basemap="satellite"]').click();
   await page.waitForTimeout(1500);
   u = await urls();
   expect(u.inset).toBe(u.utama);
+  expect(u.inset).toContain('World_Imagery');
 
-  // Mode 'none' pada peta utama: inset jatuh ke Minimal supaya tetap terlihat
+  // Mode 'none' pada peta utama: inset jatuh ke Peta Jalan (OSM) supaya tetap terlihat
   await page.locator('[data-basemap="none"]').click();
   await page.waitForTimeout(1500);
   u = await urls();
   expect(u.inset).not.toBe('');
-  expect(u.inset).toContain('cartocdn');
+  expect(u.inset).toContain('openstreetmap');
+});
+
+test('inset: perbesaran "Sangat luas" lebih luas dari "Dekat" dan selalu zoom-out dari peta utama', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1400);
+
+  // Set peta utama di Bandung zoom 14
+  await page.evaluate(() => map.setView([-6.9175, 107.6191], 14, { animate: false }));
+  await page.waitForTimeout(600);
+
+  // 1. Pilih "Sangat luas (negara)" (value: '2')
+  await page.locator('#kop-inset-zoom').selectOption('2');
+  await page.waitForTimeout(600);
+  const spanNegara = await page.evaluate(() => {
+    const b = FormalSheet.insetMap.getBounds();
+    return b.getEast() - b.getWest();
+  });
+
+  // 2. Pilih "Dekat (kabupaten)" (value: '8')
+  await page.locator('#kop-inset-zoom').selectOption('8');
+  await page.waitForTimeout(600);
+  const spanKabupaten = await page.evaluate(() => {
+    const b = FormalSheet.insetMap.getBounds();
+    return b.getEast() - b.getWest();
+  });
+
+  // Skala negara harus mencakup rentang bujur yang jauh lebih lebar dibanding skala kabupaten
+  expect(spanNegara).toBeGreaterThan(spanKabupaten * 4);
+
+  // Kedua opsi harus tetap lebih luas (zoom-out) daripada peta utama
+  const spanUtama = await page.evaluate(() => {
+    const b = map.getBounds();
+    return b.getEast() - b.getWest();
+  });
+  expect(spanKabupaten).toBeGreaterThan(spanUtama);
+  expect(spanNegara).toBeGreaterThan(spanUtama);
 });
 
 /* ============================================================
@@ -1672,6 +1713,51 @@ test('graticule: label tidak terpotong di semua tingkat zoom', async ({ page }) 
     expect(tepi.bawah).toBe(0);
     expect(tepi.adaTinta).toBeGreaterThan(0);   // bukan kosong
   }
+});
+
+test('graticule: opsi posisi teks di dalam peta atau di luar peta berfungsi', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+  await page.locator('[data-tpl="formal"]').click();
+  await page.waitForTimeout(1200);
+
+  // Bawaan: outside (di luar peta)
+  expect(await page.evaluate(() => layout.kop.gridPos)).toBe('outside');
+  await expect(page.locator('#kop-grid-pos')).toHaveValue('outside');
+
+  // Ganti ke 'inside' (di dalam peta)
+  await page.locator('#kop-grid-pos').selectOption('inside');
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => layout.kop.gridPos)).toBe('inside');
+
+  // Kanvas tetap menggambar tinta & tidak bocor ke pixel paling tepi (0 dan W-1)
+  const cek = await page.evaluate(() => {
+    const c = document.querySelector('#fl-graticule');
+    const ctx = c.getContext('2d');
+    const W = c.width, H = c.height;
+    const hitung = (x0, y0, w, h) => {
+      const d = ctx.getImageData(x0, y0, w, h).data;
+      let n = 0;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) n++;
+      return n;
+    };
+    return {
+      kiri: hitung(0, 0, 1, H), kanan: hitung(W - 1, 0, 1, H),
+      atas: hitung(0, 0, W, 1), bawah: hitung(0, H - 1, W, 1),
+      adaTinta: hitung(0, 0, W, H)
+    };
+  });
+  expect(cek.kiri).toBe(0);
+  expect(cek.kanan).toBe(0);
+  expect(cek.atas).toBe(0);
+  expect(cek.bawah).toBe(0);
+  expect(cek.adaTinta).toBeGreaterThan(0);
+
+  // Kembali ke 'outside'
+  await page.locator('#kop-grid-pos').selectOption('outside');
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => layout.kop.gridPos)).toBe('outside');
 });
 
 test('graticule: nilai koordinat dinormalisasi (tidak ada 190°E)', async ({ page }) => {
@@ -1811,7 +1897,8 @@ test('cetak: proporsi & urutan blok sama seperti di layar', async ({ page }) => 
   });
 
   const layar = await ukur();
-  expect(layar.petaPersen).toBeGreaterThan(70);
+  // Dengan margin keliling dan gap antara peta & panel, proporsi peta adalah ~68%
+  expect(layar.petaPersen).toBeGreaterThan(67);
   expect(layar.legenda).toBe(3);
 
   // Ukuran kertas berbeda: proporsi & jumlah blok harus tetap
@@ -2285,7 +2372,7 @@ test('shortcut: tombol huruf tidak mengganggu saat mengetik di kolom teks', asyn
   await expect(page.locator('#layout-title')).toHaveValue('peta');
 
   // Di luar kolom teks, shortcut tetap berfungsi
-  await page.locator('#map').click({ position: { x: 700, y: 400 } });
+  await page.locator('#map').click({ position: { x: 350, y: 250 } });
   await page.keyboard.press('p');
   await page.waitForTimeout(400);
   expect(await page.evaluate(() =>
@@ -2679,8 +2766,8 @@ test('skala & kompas: aman di viewport sempit dan lebar serta mode cetak', async
       barKeluar: sr ? Math.round(Math.max(0, sr.right - panel.right)) : 0,
       kompasKeluar: kr ? Math.round(Math.max(0, kr.right - panel.right)) : 0,
       rowOverflow: row ? Math.round(row.scrollWidth - row.clientWidth) : 0,
-      // Skala & kompas tidak boleh bertumpuk
-      tumpang: (sr && kr) ? Math.round(Math.max(0, sr.right - kr.left)) : 0,
+      // Skala & kompas tidak boleh bertumpuk (kompas di kiri, skala di kanan)
+      tumpang: (sr && kr) ? Math.round(Math.max(0, kr.right - sr.left)) : 0,
       barLebar: sr ? Math.round(sr.width) : 0,
       kompasAda: !!kompas
     };
@@ -2860,3 +2947,397 @@ test('bagian peta: isi teks tidak menimpa keputusan sembunyi', async ({ page }) 
   expect(v.activity).toBe('none');
   expect(v.teksMasihAda).toBe('PETA UJI');   // isi tetap ada, hanya disembunyikan
 });
+
+test('bagian peta: tambah bagian kustom, ubah urutan, dan hapus bagian kustom', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // 1. Tambah bagian kustom
+  await page.click('#btn-add-custom-block');
+  await page.waitForTimeout(500);
+
+  const customCheck = await page.evaluate(() => {
+    const el = document.querySelector('.fl-custom-block');
+    const customList = layout.kop.customBlocks || [];
+    return {
+      adaDiDOM: !!el,
+      jumlahKustom: customList.length,
+      customId: customList[0] && customList[0].id,
+      judul: el ? el.querySelector('.fl-custom-head').textContent : '',
+      isi: el ? el.querySelector('.fl-custom-body').textContent : ''
+    };
+  });
+  expect(customCheck.adaDiDOM).toBe(true);
+  expect(customCheck.jumlahKustom).toBe(1);
+  expect(customCheck.judul).toContain('Keterangan');
+
+  // 2. Ubah urutan: pindahkan blok kustom ke atas
+  const cid = customCheck.customId;
+  await page.evaluate((id) => {
+    pindahUrutanBlok(id, -1);
+  }, cid);
+  await page.waitForTimeout(500);
+
+  const orderCheck = await page.evaluate((id) => {
+    const order = layout.kop.blokOrder || [];
+    const idx = order.indexOf(id);
+    const panel = document.querySelector('.fl-panel');
+    const children = Array.from(panel.children);
+    const customNode = panel.querySelector(`[data-custom-id="${id}"]`);
+    const customDomIdx = children.indexOf(customNode);
+    return { idx, customDomIdx, order };
+  });
+  expect(orderCheck.idx).toBeLessThan(orderCheck.order.length - 1);
+
+  // 3. Simpan dan reload: pastikan bagian kustom dan urutan dipulihkan
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d),
+    await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1')));
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  const reloaded = await page.evaluate((id) => {
+    const el = document.querySelector(`[data-custom-id="${id}"]`);
+    const k = JSON.parse(localStorage.getItem('delinaisi-maker-v1')).layout.kop;
+    return {
+      adaDiDOM: !!el,
+      jumlahKustom: (k.customBlocks || []).length,
+      urutanTersimpan: (k.blokOrder || []).includes(id)
+    };
+  }, cid);
+  expect(reloaded.adaDiDOM).toBe(true);
+  expect(reloaded.jumlahKustom).toBe(1);
+  expect(reloaded.urutanTersimpan).toBe(true);
+
+  // 4. Hapus bagian kustom
+  await page.evaluate((id) => {
+    hapusBagianKustom(id);
+  }, cid);
+  await page.waitForTimeout(500);
+
+  const afterDelete = await page.evaluate((id) => {
+    const el = document.querySelector(`[data-custom-id="${id}"]`);
+    const k = layout.kop;
+    return {
+      adaDiDOM: !!el,
+      jumlahKustom: (k.customBlocks || []).length
+    };
+  }, cid);
+  expect(afterDelete.adaDiDOM).toBe(false);
+  expect(afterDelete.jumlahKustom).toBe(0);
+});
+
+test('bagian peta: judul komponen dapat diedit langsung (inline editable) & tersimpan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Edit judul legenda & judul sumber data langsung di lembar formal
+  await page.evaluate(() => {
+    const legHead = document.querySelector('#fl-head-legend');
+    if (legHead) {
+      legHead.textContent = 'KETERANGAN SIMBOL:';
+      legHead.dispatchEvent(new Event('input'));
+    }
+    const srcHead = document.querySelector('#fl-head-source');
+    if (srcHead) {
+      srcHead.textContent = 'REFERENSI DATA DASAR:';
+      srcHead.dispatchEvent(new Event('input'));
+    }
+    const knowEl = document.querySelector('#fl-sign-know');
+    if (knowEl) {
+      knowEl.textContent = 'Disetujui oleh:';
+      knowEl.dispatchEvent(new Event('input'));
+    }
+  });
+  await page.waitForTimeout(800);
+
+  // Simpan dan reload
+  await page.addInitScript((d) => localStorage.setItem('delinaisi-maker-v1', d),
+    await page.evaluate(() => localStorage.getItem('delinaisi-maker-v1')));
+  await page.reload();
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(2000);
+
+  const reloaded = await page.evaluate(() => ({
+    legenda: document.querySelector('#fl-head-legend').textContent,
+    sumber: document.querySelector('#fl-head-source').textContent,
+    pengesahan: document.querySelector('#fl-sign-know').textContent
+  }));
+
+  expect(reloaded.legenda).toBe('KETERANGAN SIMBOL:');
+  expect(reloaded.sumber).toBe('REFERENSI DATA DASAR:');
+  expect(reloaded.pengesahan).toBe('Disetujui oleh:');
+});
+
+test('legenda: menampilkan total luas dan panjang per kategori bila opsi diaktifkan', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Buat poligon contoh
+  await page.evaluate(() => {
+    const latlngs = [
+      [-6.2, 106.8],
+      [-6.2, 106.81],
+      [-6.21, 106.81],
+      [-6.21, 106.8]
+    ];
+    const poly = L.polygon(latlngs);
+    addFeature({
+      id: 991,
+      layer: poly,
+      type: 'Polygon',
+      name: 'Zona Uji',
+      category: 'fasilitas'
+    }, true);
+  });
+  await page.waitForTimeout(500);
+
+  // Cek apakah ukuran tampil di legenda
+  let measureText = await page.evaluate(() => {
+    const m = document.querySelector('.fl-legend-measure');
+    return m ? m.textContent : '';
+  });
+  expect(measureText).toMatch(/(ha|m²)/);
+
+  // Nonaktifkan opsi ukuran di legenda
+  await page.evaluate(() => {
+    const cb = document.querySelector('#kop-legend-show-measure');
+    if (cb) {
+      cb.checked = false;
+      cb.dispatchEvent(new Event('change'));
+    }
+  });
+  await page.waitForTimeout(500);
+
+  measureText = await page.evaluate(() => {
+    const m = document.querySelector('.fl-legend-measure');
+    return m ? m.textContent : '';
+  });
+  expect(measureText).toBe('');
+});
+
+test('arah utara: mendukung berbagai model visual dan pergantian huruf U/N', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Ganti model arah utara ke star dan huruf ke N
+  await page.evaluate(() => {
+    const styleSel = document.querySelector('#kop-north-style');
+    if (styleSel) {
+      styleSel.value = 'star';
+      styleSel.dispatchEvent(new Event('change'));
+    }
+    const letterSel = document.querySelector('#kop-north-letter');
+    if (letterSel) {
+      letterSel.value = 'N';
+      letterSel.dispatchEvent(new Event('change'));
+    }
+  });
+  await page.waitForTimeout(500);
+
+  const starRes = await page.evaluate(() => {
+    const host = document.querySelector('#fl-compass-host');
+    return {
+      className: host ? host.className : '',
+      text: host ? host.textContent.trim() : ''
+    };
+  });
+  expect(starRes.className).toContain('fl-compass--star');
+  expect(starRes.text).toContain('N');
+
+  // Ganti lagi ke triangle dan huruf U
+  await page.evaluate(() => {
+    const styleSel = document.querySelector('#kop-north-style');
+    if (styleSel) {
+      styleSel.value = 'triangle';
+      styleSel.dispatchEvent(new Event('change'));
+    }
+    const letterSel = document.querySelector('#kop-north-letter');
+    if (letterSel) {
+      letterSel.value = 'U';
+      letterSel.dispatchEvent(new Event('change'));
+    }
+  });
+  await page.waitForTimeout(500);
+
+  const triRes = await page.evaluate(() => {
+    const host = document.querySelector('#fl-compass-host');
+    return {
+      className: host ? host.className : '',
+      text: host ? host.textContent.trim() : ''
+    };
+  });
+  expect(triRes.className).toContain('fl-compass--triangle');
+  expect(triRes.text).toContain('U');
+});
+
+test('skala: skala kustom dan preset menyesuaikan zoom otomatis serta label peta', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  // Terapkan skala preset 1:50.000 lewat pemilih preset
+  await page.evaluate(() => {
+    const presetSel = document.querySelector('#kop-scale-preset');
+    if (presetSel) {
+      presetSel.value = '50000';
+      presetSel.dispatchEvent(new Event('change'));
+    }
+  });
+  await page.waitForTimeout(600);
+
+  const scaleState = await page.evaluate(() => {
+    const label = document.querySelector('#fl-scale-label');
+    return {
+      label: label ? label.textContent : '',
+      zoom: map.getZoom(),
+      scaleCustom: layout.kop.scaleCustom,
+      scaleMode: layout.kop.scaleMode
+    };
+  });
+
+  expect(scaleState.scaleMode).toBe('custom');
+  expect(scaleState.scaleCustom).toBe('50000');
+  expect(scaleState.label).toContain('50.000');
+  expect(scaleState.zoom).toBeGreaterThanOrEqual(10);
+
+  // Edit skala inline langsung di lembar formal (#fl-scale-label)
+  await page.evaluate(() => {
+    const label = document.querySelector('#fl-scale-label');
+    if (label) {
+      label.textContent = 'SKALA: 1:100.000';
+      label.dispatchEvent(new Event('input'));
+    }
+  });
+  await page.waitForTimeout(600);
+
+  const afterInline = await page.evaluate(() => ({
+    scaleCustom: layout.kop.scaleCustom,
+    label: document.querySelector('#fl-scale-label').textContent,
+    zoom: map.getZoom()
+  }));
+
+  expect(afterInline.scaleCustom).toBe('100000');
+  expect(afterInline.label).toContain('100.000');
+});
+
+test('batas administrasi: tingkat nasional, filter laut vs daratan, dan salin ke delinasi', async ({ page }) => {
+  const COUNTRY_FIXTURE = [
+    {
+      display_name: 'Indonesia',
+      name: 'Indonesia',
+      category: 'boundary',
+      type: 'administrative',
+      place_rank: 4,
+      osm_type: 'relation',
+      osm_id: 304751,
+      geojson: {
+        type: 'MultiPolygon',
+        coordinates: [
+          // Sub-polygon 1 (daratan 1) dengan 25 titik
+          [Array.from({ length: 25 }, (_, i) => [106.8 + i * 0.005, -6.2])],
+          // Sub-polygon 2 (daratan 2) dengan 25 titik
+          [Array.from({ length: 25 }, (_, i) => [107.0 + i * 0.005, -6.9])]
+        ]
+      }
+    }
+  ];
+
+  await page.route('**/nominatim.openstreetmap.org/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(COUNTRY_FIXTURE)
+    });
+  });
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Verifikasi levelOf
+  const lvl = await page.evaluate(() => AdminBoundaries.levelOf(4));
+  expect(lvl.id).toBe('country');
+
+  // Pilih tingkat nasional dan cari Indonesia
+  await page.locator('#admin-level').selectOption('country');
+  await page.locator('#admin-q').fill('Indonesia');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1500);
+
+  await expect(page.locator('.admin-item')).toHaveCount(1);
+  await page.locator('.admin-item').first().click();
+  await page.waitForTimeout(800);
+
+  await expect(page.locator('#admin-loaded')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#admin-loaded-meta')).toContainText('Nasional');
+
+  // Uji filter laut / daratan
+  await page.locator('#admin-sea').selectOption('land');
+  await page.waitForTimeout(400);
+
+  // Klik tombol "+ Salin ke Delinasi"
+  await page.locator('#admin-to-feature').click();
+  await page.waitForTimeout(800);
+
+  // Fitur tersalin ke delinasi user
+  const featCount = await page.evaluate(() => features.length);
+  expect(featCount).toBe(1);
+  await expect(page.locator('#feat-count')).toHaveText('1');
+  await expect(page.locator('.feat-name')).toHaveText('Indonesia');
+});
+
+test('pewarnaan & transparansi: opacity slider per fitur dan per kategori, serta warna kustom', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Buat sebuah poligon contoh
+  await page.locator('.tool[data-tool="Polygon"]').click();
+  await drawPolygon(page, [[0.25, 0.33], [0.75, 0.33], [0.50, 0.62]]);
+
+  // Atur warna kustom dan opacity di modal
+  await page.locator('#attr-name').fill('Area Terlindung');
+  await page.locator('#attr-custom-color-toggle').check();
+  await page.locator('#attr-custom-color').fill('#e63946');
+  await page.locator('#attr-opacity').fill('65');
+  await page.locator('#attr-opacity').dispatchEvent('input');
+  await expect(page.locator('#attr-opacity-val')).toHaveText('65%');
+
+  await page.locator('#attr-save').click();
+  await page.waitForTimeout(500);
+
+  // Cek nilai pada objek fitur dan Leaflet layer
+  const fState = await page.evaluate(() => {
+    const f = features[0];
+    return {
+      customColor: f.customColor,
+      fillOpacity: f.fillOpacity,
+      layerColor: f.layer.options.color,
+      layerFillColor: f.layer.options.fillColor,
+      layerFillOpacity: f.layer.options.fillOpacity
+    };
+  });
+
+  expect(fState.customColor).toBe('#e63946');
+  expect(fState.fillOpacity).toBe(0.65);
+  expect(fState.layerColor).toBe('#e63946');
+  expect(fState.layerFillOpacity).toBe(0.65);
+
+  // Cek apakah tersimpan ke localStorage
+  const savedState = await page.evaluate(() => {
+    const raw = localStorage.getItem('delinaisi-maker-v1');
+    const data = JSON.parse(raw);
+    return data.features[0];
+  });
+  expect(savedState.customColor).toBe('#e63946');
+  expect(savedState.fillOpacity).toBe(0.65);
+});
+
+
+
+

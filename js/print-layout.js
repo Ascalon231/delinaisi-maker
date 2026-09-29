@@ -56,7 +56,7 @@ const PaperLayout = (function () {
   // Dihilangkan dengan `visibility` (bukan `display`) supaya tata letak
   // tidak bergeser sedikit pun saat dipotret.
   const HIDE_SELECTORS = [
-    '#search-box', '#coord-badge', '#measure-badge', '#tile-loader',
+    '#search-box', '#coord-badge', '#measure-badge', '#draw-guide-banner', '#tile-loader',
     '.leaflet-control-zoom', '.leaflet-control-scale',
     '.leaflet-control-attribution', '.leaflet-popup-pane'
   ];

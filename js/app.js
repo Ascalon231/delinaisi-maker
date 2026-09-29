@@ -214,6 +214,8 @@ function fmtLen(m) {
   if (m < 1000) return m.toLocaleString('id-ID', { maximumFractionDigits: 0 }) + ' m';
   return (m / 1000).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' km';
 }
+window.fmtArea = fmtArea;
+window.fmtLen = fmtLen;
 // Koordinat gaya Indonesia: koma desimal + arah mata angin (LU/LS/BT/BB).
 // Sebelumnya memakai titik desimal tanpa arah, sehingga kurang jelas bagi
 // pembaca laporan di Indonesia.
@@ -278,19 +280,23 @@ function measureRows(f) {
 // keterbacaan dijaga lewat GARIS TEPI yang tegas + halo putih tipis.
 // Halo ini yang membuat poligon tetap terlihat di atas basemap gelap
 // (mis. Satelit/Gelap), di mana warna seperti ungu bisa tenggelam.
-function styleFor(type, color) {
+function styleFor(type, color, fillOpacity, customColor) {
+  // customColor: warna khusus per-fitur (bisa berbeda dari warna kategori).
+  // fillOpacity: 0–1, default 0.28. Null = pakai default.
+  const c = customColor || color;
+  const fo = (fillOpacity != null) ? fillOpacity : 0.28;
   if (type === 'Polyline') {
     // Garis juga dapat halo: garis tipis paling rawan tenggelam di
     // atas basemap gelap.
-    return { color, weight: 3, opacity: .98, lineJoin: 'round', halo: true };
+    return { color: c, weight: 3, opacity: .98, lineJoin: 'round', halo: true };
   }
   if (type === 'Marker') return {};
   return {
-    color,
+    color: c,
     weight: 2.5,
     opacity: .98,
-    fillColor: color,
-    fillOpacity: .28,
+    fillColor: c,
+    fillOpacity: fo,
     lineJoin: 'round',
     // Halo putih di bawah garis agar kontras terjaga di latar apa pun.
     // Leaflet tidak punya properti ini, jadi dipasang sebagai opsi kustom
@@ -406,14 +412,21 @@ function refreshAllLabels() {
 }
 
 function applyStyle(f) {
+  // Warna dasar dari kategori; customColor bisa menimpa per-fitur.
   const color = catOf(f.category).color;
+  // Opacity kategori sebagai default, lalu opacity fitur bisa override.
+  const catOpacity = catOf(f.category).fillOpacity;
+  const fo = (f.fillOpacity != null) ? f.fillOpacity
+    : (catOpacity != null) ? catOpacity
+    : 0.28;
   if (f.type === 'Marker') {
-    if (f.layer.setIcon) f.layer.setIcon(markerIcon(color));
+    const c = f.customColor || color;
+    if (f.layer.setIcon) f.layer.setIcon(markerIcon(c));
   } else if (f.layer.setStyle) {
-    f.layer.setStyle(styleFor(f.type, color));
+    f.layer.setStyle(styleFor(f.type, color, fo, f.customColor || null));
   }
   // Halo putih menjaga keterbacaan di atas basemap gelap.
-  applyHalo(f, color);
+  applyHalo(f, f.customColor || color);
   // Label nama fitur.
   applyLabel(f);
 }
@@ -522,6 +535,7 @@ function addFeature(f, openModal) {
   refreshFeature(f);
   features.push(f);
   renderList();
+  if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
   save('Tambah fitur');
   if (openModal) {
     openAttrModal(f.id, true);
@@ -542,6 +556,7 @@ function deleteFeature(id) {
   }
   features.splice(i, 1);
   renderList();
+  if (typeof FormalSheet !== 'undefined') FormalSheet.onFeaturesChanged();
   save();
   // Tawarkan urungkan penghapusan (safety net, sangat penting untuk mahasiswa!).
   toast('Fitur "' + (removed.name || 'tanpa nama') + '" dihapus', {
@@ -598,6 +613,20 @@ function startDraw(type) {
   $$('.tool[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === type));
   $('#draw-hint').textContent = HINT[type] || '';
   setBadge(HINT[type] || '');
+
+  const isMulti = type === 'Polygon' || type === 'Polyline';
+  setGuideBanner(
+    HINT[type] || 'Klik di peta untuk menggambar.',
+    isMulti ? 'Selesai (Enter)' : 'Batal (Esc)',
+    isMulti ? () => {
+      if (currentDrawer && typeof currentDrawer.completeShape === 'function') {
+        currentDrawer.completeShape();
+      } else {
+        stopDraw();
+      }
+    } : stopDraw,
+    type === 'Marker' ? '📍' : '✏️'
+  );
 }
 
 function stopDraw() {
@@ -607,11 +636,35 @@ function stopDraw() {
     currentDrawerType = null;
   }
   setBadge('');
+  setGuideBanner(null);
 
   $$('.tool[data-tool]').forEach(b => b.classList.remove('active'));
   $('#draw-hint').textContent =
     'Pilih salah satu alat di atas, lalu klik di peta untuk mulai menggambar. Klik dua kali (atau Enter) untuk selesaikan poligon/garis.';
   try { delete window.__drawer; } catch (e) { window.__drawer = undefined; }
+}
+
+function setGuideBanner(text, btnLabel, btnAction, icon) {
+  const banner = $('#draw-guide-banner');
+  if (!banner) return;
+  if (!text) {
+    banner.classList.add('hidden');
+    return;
+  }
+  const textEl = $('#draw-guide-text');
+  const btnEl = $('#draw-guide-btn');
+  const iconEl = $('#draw-guide-icon');
+  if (textEl) textEl.textContent = text;
+  if (iconEl) iconEl.textContent = icon || '✏️';
+  if (btnEl) {
+    btnEl.textContent = btnLabel || 'Batal';
+    btnEl.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof btnAction === 'function') btnAction();
+    };
+  }
+  banner.classList.remove('hidden');
 }
 
 function setBadge(html) {
@@ -632,6 +685,12 @@ function startEdit() {
   editHandler.enable();
   $('#tool-edit').classList.add('active');
   setBadge('Mode edit: tarik sudut pada fitur untuk mengubah bentuk, lalu klik Simpan.');
+  setGuideBanner(
+    'Mode Ubah Bentuk: geser sudut fitur untuk merapikan batas.',
+    'Selesai Mengubah',
+    stopEdit,
+    '🔧'
+  );
   toast('Klik & tarik sudut fitur untuk mengedit');
 }
 function stopEdit() {
@@ -640,6 +699,7 @@ function stopEdit() {
   editHandler = null;
   $('#tool-edit').classList.remove('active');
   setBadge('');
+  setGuideBanner(null);
 }
 
 /* -------------------- Modal atribut -------------------- */
@@ -660,9 +720,33 @@ function openAttrModal(id, isNew) {
     '<div class="row"><span class="label">' + esc(r.label) + '</span><span class="val">' + esc(r.value) + '</span></div>'
   ).join('') || '<div class="row"><span class="val">—</span></div>';
 
+  // ---- Pewarnaan & opacity ----
+  // Sembunyikan kontrol gaya untuk titik (Marker tidak memiliki isian poligon).
+  const styleWrap = $('#attr-style-wrap');
+  if (styleWrap) styleWrap.style.display = (f.type === 'Marker') ? 'none' : '';
+
+  const opacityInput = $('#attr-opacity');
+  const opacityVal   = $('#attr-opacity-val');
+  const customToggle = $('#attr-custom-color-toggle');
+  const customRow    = $('#attr-custom-color-row');
+  const customColor  = $('#attr-custom-color');
+
+  if (opacityInput) {
+    const pct = Math.round((f.fillOpacity != null ? f.fillOpacity : 0.28) * 100);
+    opacityInput.value = pct;
+    if (opacityVal) opacityVal.textContent = pct + '%';
+  }
+  if (customToggle && customRow && customColor) {
+    const hasCustom = !!f.customColor;
+    customToggle.checked = hasCustom;
+    customRow.classList.toggle('hidden', !hasCustom);
+    customColor.value = f.customColor || catOf(f.category).color || '#2a9d8f';
+  }
+
   $('#modal-overlay').classList.remove('hidden');
   setTimeout(() => $('#attr-name').focus(), 60);
 }
+
 
 function closeAttrModal() {
   $('#modal-overlay').classList.add('hidden');
@@ -696,10 +780,6 @@ const BASEMAPS = {
     maxZoom: 19, crossOrigin: true,
     attribution: '© Esri, Maxar, Earthstar Geographics'
   }),
-  light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd', crossOrigin: true,
-    attribution: '© OpenStreetMap, © CARTO'
-  }),
   // Relief/terrain: penting untuk analisis wilayah (kemiringan, DAS, tutupan lahan).
   terrain: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
     maxZoom: 19, crossOrigin: true,
@@ -709,16 +789,6 @@ const BASEMAPS = {
   topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
     maxZoom: 17, crossOrigin: true,
     attribution: '© OpenTopoMap (CC-BY-SA), © kontributor OpenStreetMap'
-  }),
-  // Versi gelap: enak dilihat malam & membuat poligon berwarna lebih menonjol.
-  dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd', crossOrigin: true,
-    attribution: '© OpenStreetMap, © CARTO'
-  }),
-  // Peta jalan versi CARTO: label lebih bersih dari OSM standar.
-  voyager: L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd', crossOrigin: true,
-    attribution: '© OpenStreetMap, © CARTO'
   }),
   // Tanpa peta dasar: hanya latar polos, untuk delinasi di atas citra sendiri.
   none: L.tileLayer('', { attribution: '' })
@@ -759,7 +829,7 @@ const KOP_DEFAULTS = {
   programStudy: '', institution: '', logo: '', logoName: '',
   // Diagram lokasi (inset) — semua bisa diubah user.
   insetShow: true,
-  insetBasemap: 'light',   // light | streets | terrain | satellite | dark | follow
+  insetBasemap: 'streets', // streets | terrain | satellite | topo | follow
   insetZoom: '4',          // seberapa jauh zoom-out dari peta utama
   insetHeight: '150',      // px
   insetColor: '#e01b1b',   // warna kotak cakupan
@@ -767,7 +837,22 @@ const KOP_DEFAULTS = {
   insetLabel: 'Diagram Lokasi:',
   activityTitle: '', activityYear: String(new Date().getFullYear()),
   projection: 'Universal Transverse Mercator', zone: 'UTM 52S', datum: 'WGS 1984',
-  sourceData: '', supervisorTitle: '', mapmakerName: '', mapmakerDegree: ''
+  sourceData: '', supervisorTitle: '', mapmakerName: '', mapmakerDegree: '',
+  gridPos: 'outside',      // outside (luar peta) | inside (dalam peta)
+  legendTitle: 'LEGENDA:',
+  sourceTitle: 'SUMBER DATA DAN RIWAYAT PETA:',
+  signKnowTitle: 'Mengetahui,',
+  refTitle: 'SISTEM KOORDINAT:',
+  titleAlign: 'center',    // center | left | right
+  instAlign: 'left',       // left | center | right
+  signAlign: 'right',      // right | center | left
+  legendShowMeasure: true,
+  northStyle: 'classic',   // classic | triangle | modern | star | survey
+  northLetter: 'U',        // U | N
+  scaleMode: 'auto',       // auto | custom
+  scaleCustom: '25000',
+  customBlocks: [],
+  blokOrder: []
 };
 
 const layout = {
@@ -775,7 +860,7 @@ const layout = {
   // Nama fitur ditampilkan di peta (label permanen), bukan hanya di popup.
   showLabels: true,
   tpl: 'formal',
-  kop: Object.assign({}, KOP_DEFAULTS)
+  kop: Object.assign({}, KOP_DEFAULTS, { customBlocks: [], blokOrder: [] })
 };
 
 // Layout peta: HANYA lembar "Kop Akademik".
@@ -795,9 +880,14 @@ function normalizeTplId(id) { return TEMPLATES[id] ? id : 'formal'; }
 
 // Selaraskan kontrol panel dengan state (dipakai saat preset formal aktif).
 function syncKopInputs() {
-  KOP_FIELDS.forEach(({ field, id }) => {
+  KOP_FIELDS.forEach(({ field, id, isBool }) => {
     const el = $('#' + id);
-    if (el && layout.kop[field] != null) el.value = layout.kop[field];
+    if (!el || layout.kop[field] == null) return;
+    if (isBool || el.type === 'checkbox') {
+      el.checked = !!layout.kop[field];
+    } else {
+      el.value = layout.kop[field];
+    }
   });
   // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
 }
@@ -855,7 +945,20 @@ const KOP_FIELDS = [
   { field: 'insetHeight',     id: 'kop-inset-height' },
   { field: 'insetColor',      id: 'kop-inset-color' },
   { field: 'insetGrid',       id: 'kop-inset-grid' },
-  { field: 'insetLabel',      id: 'kop-inset-label' }
+  { field: 'insetLabel',      id: 'kop-inset-label' },
+  // Opsi grid koordinat peta utama
+  { field: 'gridPos',         id: 'kop-grid-pos' },
+  // Opsi perataan teks kop
+  { field: 'titleAlign',      id: 'kop-title-align' },
+  { field: 'instAlign',       id: 'kop-inst-align' },
+  { field: 'signAlign',       id: 'kop-sign-align' },
+  // Opsi arah utara & skala
+  { field: 'northStyle',        id: 'kop-north-style' },
+  { field: 'northLetter',       id: 'kop-north-letter' },
+  { field: 'scaleMode',         id: 'kop-scale-mode' },
+  { field: 'scaleCustom',       id: 'kop-scale-custom' },
+  // Opsi legenda
+  { field: 'legendShowMeasure', id: 'kop-legend-show-measure', isBool: true }
 ];
 
 function formatDateID(d) {
@@ -867,11 +970,8 @@ function basemapAttribution(id) {
   const m = {
     streets: 'OpenStreetMap & kontributornya',
     satellite: 'Esri, Maxar, Earthstar Geographics',
-    light: 'OpenStreetMap & CARTO',
     terrain: 'Esri, HERE, Garmin, USGS, Intermap',
     topo: 'OpenTopoMap (CC-BY-SA) & kontributor OpenStreetMap',
-    dark: 'OpenStreetMap & CARTO',
-    voyager: 'OpenStreetMap & CARTO',
     none: 'Data delinasi pengguna'
   };
   return m[id] || 'OpenStreetMap';
@@ -885,6 +985,32 @@ function updateLayout() {
   FormalSheet.scheduleRefresh();
 }
 
+// Atur skala peta ke rasio tertentu (1:rf) dengan menyesuaikan zoom otomatis.
+function aturSkalaPeta(rf) {
+  if (!map || !rf || rf <= 0) return;
+  const lat = map.getCenter().lat;
+  const targetZoom = typeof FormalLayout !== 'undefined' && FormalLayout.zoomForScale
+    ? FormalLayout.zoomForScale(rf, lat)
+    : 14;
+  map.setZoom(Math.round(targetZoom));
+  if (layout.kop) {
+    layout.kop.scaleCustom = String(rf);
+    layout.kop.scaleMode = 'custom';
+    const customInp = $('#kop-scale-custom');
+    if (customInp) customInp.value = String(rf);
+    const modeEl = $('#kop-scale-mode');
+    if (modeEl) modeEl.value = 'custom';
+    const presetEl = $('#kop-scale-preset');
+    if (presetEl) {
+      const match = Array.from(presetEl.options).some(o => o.value === String(rf));
+      if (match) presetEl.value = String(rf);
+    }
+  }
+  updateLayout();
+  save();
+}
+window.aturSkalaPeta = aturSkalaPeta;
+
 function bindLayout() {
   $('#layout-title').addEventListener('input', (e) => {
     layout.title = e.target.value;
@@ -893,6 +1019,12 @@ function bindLayout() {
   });
   $('#layout-author').addEventListener('input', (e) => {
     layout.author = e.target.value;
+    if (!layout.kop.mapmakerName || layout.kop.mapmakerName === layout._lastAuthor) {
+      layout.kop.mapmakerName = layout.author;
+      const el = $('#kop-mapmakerName');
+      if (el) el.value = layout.author;
+    }
+    layout._lastAuthor = layout.author;
     updateLayout();
     save();
   });
@@ -903,13 +1035,30 @@ function bindLayout() {
   const addBtn = $('#btn-cat-add');
   if (addBtn) addBtn.addEventListener('click', addCategory);
 
-  // Kop Akademik fields (termasuk opsi diagram lokasi)
-  KOP_FIELDS.forEach(({ field, id }) => {
+  // Kop fields (termasuk opsi diagram lokasi, skala, arah utara, dan legenda)
+  KOP_FIELDS.forEach(({ field, id, isBool }) => {
     const el = $('#' + id);
     if (!el) return;
     const commit = (e) => {
       layout.kop = layout.kop || {};
-      layout.kop[field] = e.target.value;
+      if (isBool || el.type === 'checkbox') {
+        layout.kop[field] = el.checked;
+      } else {
+        layout.kop[field] = e.target.value;
+      }
+      if (field === 'mapmakerName') {
+        if (!layout.author || layout.author === layout._lastAuthor) {
+          layout.author = e.target.value;
+          const la = $('#layout-author');
+          if (la) la.value = layout.author;
+        }
+        layout._lastAuthor = layout.author;
+      }
+      if (field === 'scaleMode' && layout.kop[field] === 'custom') {
+        const customInp = $('#kop-scale-custom');
+        const val = customInp ? Number(customInp.value) : 25000;
+        if (val > 0) aturSkalaPeta(val);
+      }
       // Beberapa opsi mengubah ubin inset, bukan sekadar teks.
       if (typeof FormalSheet !== 'undefined' && FormalSheet.applyInsetOptions) {
         FormalSheet.applyInsetOptions();
@@ -920,6 +1069,32 @@ function bindLayout() {
     el.addEventListener('input', commit);
     el.addEventListener('change', commit);
   });
+
+  const scalePreset = $('#kop-scale-preset');
+  if (scalePreset) {
+    scalePreset.addEventListener('change', (e) => {
+      const val = e.target.value;
+      const customInp = $('#kop-scale-custom');
+      if (customInp) customInp.value = val;
+      layout.kop = layout.kop || {};
+      layout.kop.scaleCustom = val;
+      layout.kop.scaleMode = 'custom';
+      const modeEl = $('#kop-scale-mode');
+      if (modeEl) modeEl.value = 'custom';
+      aturSkalaPeta(Number(val));
+    });
+  }
+
+  const btnApplyScale = $('#btn-apply-scale');
+  if (btnApplyScale) {
+    btnApplyScale.addEventListener('click', () => {
+      const customInp = $('#kop-scale-custom');
+      const val = customInp ? Number(customInp.value) : 25000;
+      if (val > 0) {
+        aturSkalaPeta(val);
+      }
+    });
+  }
 
   // Tampil/sembunyikan diagram lokasi ditangani toggle bagian peta
   // (blokVis.inset) supaya hanya ada SATU kontrol untuk satu hal.
@@ -1134,6 +1309,47 @@ function renderCategoryColors() {
       }
 
       panel.appendChild(manual);
+
+      // Slider opacity per kategori
+      const opDiv = document.createElement('div');
+      opDiv.className = 'cat-opacity-row';
+      opDiv.style.cssText = 'margin-top:10px;';
+      const currentCatOpacity = (cat.fillOpacity != null) ? cat.fillOpacity : 0.28;
+      const opLabel = document.createElement('div');
+      opLabel.style.cssText = 'display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px;';
+      const opSpan = document.createElement('span');
+      opSpan.textContent = 'Kepekatan isian kategori';
+      const opVal = document.createElement('strong');
+      opVal.textContent = Math.round(currentCatOpacity * 100) + '%';
+      opLabel.appendChild(opSpan);
+      opLabel.appendChild(opVal);
+
+      const opSlider = document.createElement('input');
+      opSlider.type = 'range';
+      opSlider.min = '0'; opSlider.max = '100'; opSlider.step = '5';
+      opSlider.value = Math.round(currentCatOpacity * 100);
+      opSlider.style.cssText = 'width:100%;margin-bottom:3px;';
+      opSlider.setAttribute('aria-label', 'Opacity isian kategori ' + cat.label);
+      opSlider.addEventListener('input', () => {
+        opVal.textContent = opSlider.value + '%';
+      });
+      opSlider.addEventListener('change', () => {
+        cat.fillOpacity = parseInt(opSlider.value, 10) / 100;
+        // Terapkan ke semua fitur berkategori ini yang tidak punya opacity kustom sendiri.
+        features.forEach(f => {
+          if (f.category === cat.id && f.fillOpacity == null) applyStyle(f);
+        });
+        save('Ubah opacity kategori ' + cat.label);
+        toast('Opacity kategori diperbarui');
+      });
+      const opHint = document.createElement('div');
+      opHint.style.cssText = 'font-size:10px;color:var(--ink-faint);';
+      opHint.textContent = 'Fitur dengan opacity kustom sendiri tidak terpengaruh';
+      opDiv.appendChild(opLabel);
+      opDiv.appendChild(opSlider);
+      opDiv.appendChild(opHint);
+      panel.appendChild(opDiv);
+
       row.appendChild(panel);
     }
 
@@ -1222,12 +1438,130 @@ function blokTampil(id) {
   return layout.kop.blokVis[id] !== false;   // default: tampil
 }
 
-function setBlokTampil(id, tampil) {
+function setBlokTampil(id, tampil, silent) {
   if (!layout.kop.blokVis) layout.kop.blokVis = {};
   layout.kop.blokVis[id] = !!tampil;
   if (typeof FormalSheet !== 'undefined') FormalSheet.scheduleRefresh();
-  updateBlokRingkasan();
+  renderBlokToggles();
   save('Tampilan bagian');
+
+  // Berikan umpan balik visual dan notifikasi yang jelas
+  if (!silent && typeof FormalSheet !== 'undefined' && FormalSheet.BLOK) {
+    const b = FormalSheet.BLOK.find(item => item.id === id);
+    const label = b ? b.label : 'Bagian';
+    if (tampil) {
+      toast('✓ ' + label + ' ditampilkan di lembar peta');
+      setTimeout(() => {
+        const domTarget = b && b.sel ? document.querySelector(b.sel) : null;
+        if (domTarget) {
+          domTarget.classList.remove('fl-block-highlight');
+          void domTarget.offsetWidth;
+          domTarget.classList.add('fl-block-highlight');
+          try {
+            domTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } catch (e) {}
+        }
+      }, 100);
+    } else {
+      toast('✗ ' + label + ' disembunyikan dari lembar peta');
+    }
+  }
+}
+
+function getBlokOrder() {
+  if (typeof FormalSheet === 'undefined' || !FormalSheet.BLOK) return [];
+  const allIds = FormalSheet.BLOK.map(b => b.id);
+  if (!layout.kop) layout.kop = Object.assign({}, KOP_DEFAULTS);
+  if (!Array.isArray(layout.kop.blokOrder) || !layout.kop.blokOrder.length) {
+    layout.kop.blokOrder = [...allIds];
+  } else {
+    // Pastikan semua id yang ada saat ini ada di blokOrder
+    allIds.forEach(id => {
+      if (!layout.kop.blokOrder.includes(id)) {
+        // Blok kustom baru disisipkan sebelum sign bila ada, atau di akhir
+        const signIdx = layout.kop.blokOrder.indexOf('sign');
+        if (signIdx !== -1) {
+          layout.kop.blokOrder.splice(signIdx, 0, id);
+        } else {
+          layout.kop.blokOrder.push(id);
+        }
+      }
+    });
+    // Hapus id yang sudah tidak valid
+    layout.kop.blokOrder = layout.kop.blokOrder.filter(id => allIds.includes(id));
+  }
+  return layout.kop.blokOrder;
+}
+
+function tambahBagianKustom() {
+  if (!layout.kop) layout.kop = Object.assign({}, KOP_DEFAULTS);
+  if (!Array.isArray(layout.kop.customBlocks)) layout.kop.customBlocks = [];
+
+  const id = 'custom_' + Date.now();
+  const nomor = layout.kop.customBlocks.length + 1;
+  const newBlock = {
+    id: id,
+    title: 'Keterangan ' + nomor + ':',
+    content: 'Tulis catatan atau keterangan tambahan di sini...'
+  };
+  layout.kop.customBlocks.push(newBlock);
+
+  if (!layout.kop.blokVis) layout.kop.blokVis = {};
+  layout.kop.blokVis[id] = true;
+
+  getBlokOrder();
+
+  if (typeof FormalSheet !== 'undefined') {
+    FormalSheet.refresh();
+  }
+  renderBlokToggles();
+  save('Tambah bagian kustom');
+  toast('Bagian kustom baru ditambahkan ke lembar peta');
+}
+
+function hapusBagianKustom(id) {
+  if (!layout.kop || !Array.isArray(layout.kop.customBlocks)) return;
+  const idx = layout.kop.customBlocks.findIndex(c => c.id === id);
+  if (idx === -1) return;
+
+  layout.kop.customBlocks.splice(idx, 1);
+
+  if (layout.kop.blokVis && layout.kop.blokVis[id] !== undefined) {
+    delete layout.kop.blokVis[id];
+  }
+
+  if (Array.isArray(layout.kop.blokOrder)) {
+    layout.kop.blokOrder = layout.kop.blokOrder.filter(item => item !== id);
+  }
+
+  if (typeof FormalSheet !== 'undefined') {
+    FormalSheet.refresh();
+  }
+  renderBlokToggles();
+  save('Hapus bagian kustom');
+  toast('Bagian kustom dihapus');
+}
+
+function pindahUrutanBlok(id, arah) {
+  const order = getBlokOrder();
+  const idx = order.indexOf(id);
+  if (idx === -1) return;
+
+  const targetIdx = idx + arah;
+  if (targetIdx < 0 || targetIdx >= order.length) return;
+
+  // Tukar posisi
+  const temp = order[idx];
+  order[idx] = order[targetIdx];
+  order[targetIdx] = temp;
+
+  layout.kop.blokOrder = order;
+
+  if (typeof FormalSheet !== 'undefined') {
+    FormalSheet.refresh();
+  }
+  renderBlokToggles();
+  save('Ubah urutan bagian');
 }
 
 function renderBlokToggles() {
@@ -1235,20 +1569,125 @@ function renderBlokToggles() {
   if (!host || typeof FormalSheet === 'undefined' || !FormalSheet.BLOK) return;
   host.innerHTML = '';
 
-  FormalSheet.BLOK.forEach(b => {
-    const row = document.createElement('label');
-    row.className = 'toggle blok-toggle';
+  const order = getBlokOrder();
+  const allBlokMap = {};
+  FormalSheet.BLOK.forEach(b => { allBlokMap[b.id] = b; });
+
+  const sortedBlok = order.map(id => allBlokMap[id]).filter(Boolean);
+
+  sortedBlok.forEach((b, idx) => {
+    const isAktif = blokTampil(b.id);
+    const row = document.createElement('div');
+    row.className = 'toggle blok-toggle blok-item-row ' + (isAktif ? 'is-active' : 'is-inactive');
+    row.dataset.blokId = b.id;
+
+    // Kontrol urutan (naik / turun)
+    const orderControls = document.createElement('div');
+    orderControls.className = 'blok-order-btns';
+
+    const btnUp = document.createElement('button');
+    btnUp.type = 'button';
+    btnUp.className = 'blok-order-btn blok-btn-up';
+    btnUp.title = 'Pindah ke atas';
+    btnUp.setAttribute('aria-label', 'Pindah ke atas: ' + b.label);
+    btnUp.innerHTML = '▲';
+    btnUp.disabled = idx === 0;
+    btnUp.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pindahUrutanBlok(b.id, -1);
+    });
+
+    const btnDown = document.createElement('button');
+    btnDown.type = 'button';
+    btnDown.className = 'blok-order-btn blok-btn-down';
+    btnDown.title = 'Pindah ke bawah';
+    btnDown.setAttribute('aria-label', 'Pindah ke bawah: ' + b.label);
+    btnDown.innerHTML = '▼';
+    btnDown.disabled = idx === sortedBlok.length - 1;
+    btnDown.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pindahUrutanBlok(b.id, 1);
+    });
+
+    orderControls.appendChild(btnUp);
+    orderControls.appendChild(btnDown);
+
+    // Checkbox input (untuk kompatibilitas state & test Playwright)
     const cb = document.createElement('input');
     cb.type = 'checkbox';
-    cb.checked = blokTampil(b.id);
+    cb.checked = isAktif;
+    cb.className = 'blok-toggle-checkbox';
     cb.setAttribute('aria-label', b.label);
-    cb.addEventListener('change', () => setBlokTampil(b.id, cb.checked));
+    cb.addEventListener('change', () => {
+      setBlokTampil(b.id, cb.checked);
+    });
+
+    const info = document.createElement('div');
+    info.className = 'blok-item-info';
+
     const span = document.createElement('span');
+    span.className = 'blok-item-name';
     span.textContent = b.label;
+    info.appendChild(span);
+
+    // Status visual & Tombol toggle
+    const statusWrap = document.createElement('div');
+    statusWrap.className = 'blok-status-wrap';
+
+    const statusBadge = document.createElement('span');
+    statusBadge.className = 'blok-status-badge ' + (isAktif ? 'badge-active' : 'badge-inactive');
+    statusBadge.innerHTML = isAktif ? '👁️ Aktif' : 'Mati';
+
+    const btnAction = document.createElement('button');
+    btnAction.type = 'button';
+    btnAction.className = 'blok-btn-action ' + (isAktif ? 'btn-kurang' : 'btn-tambah');
+    btnAction.textContent = isAktif ? 'Sembunyikan' : '+ Tampilkan';
+    btnAction.title = isAktif ? 'Sembunyikan bagian ini dari lembar peta' : 'Tampilkan bagian ini di lembar peta';
+    btnAction.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cb.checked = !cb.checked;
+      setBlokTampil(b.id, cb.checked);
+    });
+
+    statusWrap.appendChild(statusBadge);
+    statusWrap.appendChild(btnAction);
+
+    row.appendChild(orderControls);
     row.appendChild(cb);
-    row.appendChild(span);
+    row.appendChild(info);
+    row.appendChild(statusWrap);
+
+    // Tombol hapus jika bagian kustom
+    if (b.isCustom) {
+      const btnDel = document.createElement('button');
+      btnDel.type = 'button';
+      btnDel.className = 'blok-btn-delete';
+      btnDel.title = 'Hapus bagian kustom ini';
+      btnDel.setAttribute('aria-label', 'Hapus ' + b.label);
+      btnDel.innerHTML = '🗑️';
+      btnDel.addEventListener('click', (e) => {
+        e.stopPropagation();
+        hapusBagianKustom(b.id);
+      });
+      row.appendChild(btnDel);
+    }
+
+    // Klik pada baris untuk toggle tampil/sembunyi
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('.blok-order-btn') || e.target.closest('.blok-btn-delete') || e.target.closest('.blok-btn-action')) return;
+      cb.checked = !cb.checked;
+      setBlokTampil(b.id, cb.checked);
+    });
+
     host.appendChild(row);
+
+    // Sinkronkan ke sub-grup form di sidebar
+    const formSection = document.querySelector(`[data-blok-section="${b.id}"]`);
+    if (formSection) {
+      formSection.classList.toggle('blok-section-hidden', !isAktif);
+    }
   });
+
   updateBlokRingkasan();
 }
 
@@ -1257,9 +1696,10 @@ function updateBlokRingkasan() {
   if (!el || typeof FormalSheet === 'undefined' || !FormalSheet.BLOK) return;
   const total = FormalSheet.BLOK.length;
   const aktif = FormalSheet.BLOK.filter(b => blokTampil(b.id)).length;
+  const nonaktif = total - aktif;
   el.textContent = aktif === total
-    ? 'Semua bagian ditampilkan (' + total + ')'
-    : aktif + ' dari ' + total + ' bagian ditampilkan';
+    ? 'Semua ' + total + ' bagian aktif di lembar peta'
+    : aktif + ' aktif · ' + nonaktif + ' disembunyikan';
 }
 
 function setSemuaBlok(tampil) {
@@ -1276,6 +1716,8 @@ function bindBlokToggles() {
   const on = $('#blok-all-on'), off = $('#blok-all-off');
   if (on) on.addEventListener('click', () => setSemuaBlok(true));
   if (off) off.addEventListener('click', () => setSemuaBlok(false));
+  const btnAdd = $('#btn-add-custom-block');
+  if (btnAdd) btnAdd.addEventListener('click', () => tambahBagianKustom());
   renderBlokToggles();
 }
 
@@ -1588,6 +2030,46 @@ function bindAdminBoundaries() {
     AdminBoundaries.setVisible(e.target.checked);
   });
 
+  // ---- Mode laut / darat ----
+  const seaSel = $('#admin-sea');
+  if (seaSel) {
+    seaSel.addEventListener('change', () => {
+      AdminBoundaries.setSeaMode(seaSel.value);
+      // Gambar ulang batas yang sudah dimuat dengan mode baru.
+      const cur = AdminBoundaries.current;
+      if (cur) AdminBoundaries.draw(cur);
+    });
+  }
+
+  // ---- Salin batas ke fitur delinasi ----
+  const toFeatBtn = $('#admin-to-feature');
+  if (toFeatBtn) {
+    toFeatBtn.addEventListener('click', () => {
+      const cur = AdminBoundaries.current;
+      if (!cur || !cur.geom) {
+        toast('Muat batas terlebih dulu sebelum menyalin.', { type: 'error' });
+        return;
+      }
+      // Terapkan filter laut/darat sebelum menyalin.
+      const geom = AdminBoundaries.filterLand(cur.geom);
+      let layer;
+      try {
+        layer = L.geoJSON({ type: 'Feature', geometry: geom, properties: {} });
+      } catch (e) {
+        toast('Gagal mengkonversi geometri batas.', { type: 'error' });
+        return;
+      }
+      // Leaflet.geoJSON mengembalikan group; ambil layer pertamanya.
+      const sublayers = layer.getLayers();
+      if (!sublayers.length) { toast('Geometri batas kosong.'); return; }
+      const subLayer = sublayers[0];
+      const type = (geom.type === 'Point' || geom.type === 'MultiPoint') ? 'Marker' : 'Polygon';
+      addFeature({ layer: subLayer, type, name: cur.short || '' });
+      drawnItems.addLayer(subLayer);
+      toast('Batas disalin ke daftar delinasi. Warna \u0026 detail bisa diatur bebas.');
+    });
+  }
+
   $('#admin-clear').addEventListener('click', () => {
     AdminBoundaries.clear();
     $('#admin-loaded').classList.add('hidden');
@@ -1597,6 +2079,7 @@ function bindAdminBoundaries() {
     adminStatus('Batas dihapus. Tekan tombol untuk mencari lagi.');
   });
 }
+
 
 /* -------------------- Pencarian lokasi (Nominatim) -------------------- */
 let searchTimer;
@@ -1707,6 +2190,12 @@ function restoreProject(proj) {
     layout.author = L2.author || '';
     layout.showLabels = L2.showLabels !== false;
     layout.kop = Object.assign({}, KOP_DEFAULTS, L2.kop || {});
+    if (Array.isArray(layout.kop.customBlocks)) {
+      layout.kop.customBlocks = layout.kop.customBlocks.map(c => Object.assign({}, c));
+    }
+    if (Array.isArray(layout.kop.blokOrder)) {
+      layout.kop.blokOrder = [...layout.kop.blokOrder];
+    }
     dipulihkan = true;
   }
 
@@ -1725,12 +2214,9 @@ function restoreProject(proj) {
   // Sinkronkan kontrol panel dengan state yang baru dipulihkan.
   const t = $('#layout-title'); if (t) t.value = layout.title;
   const a = $('#layout-author'); if (a) a.value = layout.author;
-  KOP_FIELDS.forEach(({ field, id }) => {
-    const el = $('#' + id);
-    if (el && layout.kop[field] != null) el.value = layout.kop[field];
-  });
-  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
+  syncKopInputs();
   renderLogoPreview();
+  renderBlokToggles();
 
   applyTemplate(tpl);
 
@@ -1941,11 +2427,13 @@ function buildState() {
                 showLabels: layout.showLabels,
                 tpl: layout.tpl,
                 kop: Object.assign({}, layout.kop) },
-      // Daftar kategori lengkap: warna + nama kustom + kategori tambahan user.
+      // Daftar kategori lengkap: warna + nama kustom + opacity + kategori tambahan user.
       catColors: CATEGORIES.reduce((acc, c) => { acc[c.id] = c.color; return acc; }, {}),
-      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color })),
+      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color, fillOpacity: c.fillOpacity })),
       features: features.map(f => ({
         id: f.id, name: f.name, category: f.category, desc: f.desc, type: f.type,
+        fillOpacity: f.fillOpacity,
+        customColor: f.customColor || null,
         geometry: layerToGeometry(f.layer, f.type)
       }))
   };
@@ -1969,11 +2457,13 @@ function save(label) {
                 showLabels: layout.showLabels,
                 tpl: layout.tpl,
                 kop: Object.assign({}, layout.kop) },
-      // Daftar kategori lengkap: warna + nama kustom + kategori tambahan user.
+      // Daftar kategori lengkap: warna + nama kustom + opacity + kategori tambahan user.
       catColors: CATEGORIES.reduce((acc, c) => { acc[c.id] = c.color; return acc; }, {}),
-      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color })),
+      categories: CATEGORIES.map(c => ({ id: c.id, label: c.label, color: c.color, fillOpacity: c.fillOpacity })),
       features: features.map(f => ({
         id: f.id, name: f.name, category: f.category, desc: f.desc, type: f.type,
+        fillOpacity: f.fillOpacity,
+        customColor: f.customColor || null,
         geometry: layerToGeometry(f.layer, f.type)
       }))
     };
@@ -2025,12 +2515,14 @@ function load() {
     // Pulihkan field kop akademik
     if (data.layout.kop) {
       layout.kop = Object.assign({}, KOP_DEFAULTS, data.layout.kop);
+      if (Array.isArray(data.layout.kop.customBlocks)) {
+        layout.kop.customBlocks = data.layout.kop.customBlocks.map(c => Object.assign({}, c));
+      }
+      if (Array.isArray(data.layout.kop.blokOrder)) {
+        layout.kop.blokOrder = [...data.layout.kop.blokOrder];
+      }
     }
-    KOP_FIELDS.forEach(({ field, id }) => {
-      const el = $('#' + id);
-      if (el && layout.kop[field] != null) el.value = layout.kop[field];
-    });
-  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
+    syncKopInputs();
 
     // Layout tersimpan. Data lama bisa memuat preset yang sudah dihapus.
     layout.tpl = normalizeTplId(data.layout.tpl);
@@ -2046,7 +2538,8 @@ function load() {
       .map(c => ({
         id: c.id,
         label: (typeof c.label === 'string' && c.label.trim()) ? c.label : c.id,
-        color: normalizeHex(c.color) || '#6c757d'
+        color: normalizeHex(c.color) || '#6c757d',
+        fillOpacity: (c.fillOpacity != null) ? c.fillOpacity : undefined
       }));
     if (!CATEGORIES.length) CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
   } else if (data.catColors) {
@@ -2067,6 +2560,8 @@ function load() {
       name: sf.name || '',
       category: CATEGORIES.some(c => c.id === sf.category) ? sf.category : 'lainnya',
       desc: sf.desc || '',
+      fillOpacity: (sf.fillOpacity != null) ? sf.fillOpacity : null,
+      customColor: sf.customColor || null,
       measure: null
     });
     drawnItems.addLayer(layer);
@@ -2144,14 +2639,15 @@ function applySnapshot(raw) {
     features = [];
     if (map.__haloGroup) map.__haloGroup.clearLayers();
 
-    // Kategori (warna & nama)
+    // Kategori (warna, nama & opacity)
     if (Array.isArray(data.categories) && data.categories.length) {
       CATEGORIES = data.categories
         .filter(c => c && typeof c.id === 'string')
         .map(c => ({
           id: c.id,
           label: (typeof c.label === 'string' && c.label.trim()) ? c.label : c.id,
-          color: normalizeHex(c.color) || '#6c757d'
+          color: normalizeHex(c.color) || '#6c757d',
+          fillOpacity: (c.fillOpacity != null) ? c.fillOpacity : undefined
         }));
       if (!CATEGORIES.length) CATEGORIES = DEFAULT_CATEGORIES.map(c => Object.assign({}, c));
     }
@@ -2163,15 +2659,17 @@ function applySnapshot(raw) {
       layout.author = L2.author || '';
       layout.showLabels = L2.showLabels !== false;
       layout.kop = Object.assign({}, KOP_DEFAULTS, L2.kop || {});
+      if (Array.isArray(layout.kop.customBlocks)) {
+        layout.kop.customBlocks = layout.kop.customBlocks.map(c => Object.assign({}, c));
+      }
+      if (Array.isArray(layout.kop.blokOrder)) {
+        layout.kop.blokOrder = [...layout.kop.blokOrder];
+      }
       const t = $('#layout-title'); if (t) t.value = layout.title;
       const a = $('#layout-author'); if (a) a.value = layout.author;
       const labelToggle = $('#layout-show-labels');
       if (labelToggle) labelToggle.checked = !!layout.showLabels;
-      KOP_FIELDS.forEach(({ field, id }) => {
-        const el = $('#' + id);
-        if (el && layout.kop[field] != null) el.value = layout.kop[field];
-      });
-  // insetShow tidak lagi dipakai: visibilitas inset diatur blokVis.inset.
+      syncKopInputs();
       // Langkah riwayat lama bisa memuat preset yang sudah dihapus.
       layout.tpl = normalizeTplId(L2.tpl);
     }
@@ -2188,12 +2686,15 @@ function applySnapshot(raw) {
         name: sf.name || '',
         category: CATEGORIES.some(c => c.id === sf.category) ? sf.category : 'lainnya',
         desc: sf.desc || '',
+        fillOpacity: (sf.fillOpacity != null) ? sf.fillOpacity : null,
+        customColor: sf.customColor || null,
         measure: null
       };
       drawnItems.addLayer(layer);
       refreshFeature(f);
       features.push(f);
     });
+
 
     if (data.seq) idSeq = data.seq;
 
@@ -2204,6 +2705,7 @@ function applySnapshot(raw) {
     renderCategoryColors();
     renderCategorySelect();
     renderLogoPreview();
+    renderBlokToggles();
 
     // Lembar kop dipasang dari state (satu-satunya layout aplikasi).
     if (!document.querySelector('.formal-sheet')) applyTemplate(layout.tpl);
@@ -2368,13 +2870,45 @@ function init() {
     f.name = $('#attr-name').value.trim();
     f.category = $('#attr-category').value;
     f.desc = $('#attr-desc').value.trim();
+
+    // Simpan opacity kustom per-fitur
+    const opacityInput = $('#attr-opacity');
+    if (opacityInput) {
+      f.fillOpacity = parseInt(opacityInput.value, 10) / 100;
+    }
+    // Simpan warna kustom per-fitur (bila toggle aktif)
+    const customToggle = $('#attr-custom-color-toggle');
+    const customColorInput = $('#attr-custom-color');
+    if (customToggle && customColorInput) {
+      f.customColor = customToggle.checked ? (customColorInput.value || null) : null;
+    }
+
     refreshFeature(f);
     renderList();
     save('Ubah detail fitur');
     closeAttrModal();
     toast('Detail fitur disimpan');
   });
+
   $('#attr-cancel').addEventListener('click', closeAttrModal);
+
+  // ---- Interaksi live di modal: opacity slider & custom color toggle ----
+  const attrOpacity = $('#attr-opacity');
+  const attrOpacityVal = $('#attr-opacity-val');
+  if (attrOpacity && attrOpacityVal) {
+    attrOpacity.addEventListener('input', () => {
+      attrOpacityVal.textContent = attrOpacity.value + '%';
+    });
+  }
+  const attrCCToggle = $('#attr-custom-color-toggle');
+  const attrCCRow    = $('#attr-custom-color-row');
+  if (attrCCToggle && attrCCRow) {
+    attrCCToggle.addEventListener('change', () => {
+      attrCCRow.classList.toggle('hidden', !attrCCToggle.checked);
+    });
+  }
+
+
   $('#modal-overlay').addEventListener('click', (e) => {
     if (e.target === $('#modal-overlay')) closeAttrModal();
   });
@@ -2466,7 +3000,7 @@ function init() {
   };
   document.addEventListener('keydown', (e) => {
     const tag = (e.target.tagName || '').toLowerCase();
-    const diKolomTeks = (tag === 'input' || tag === 'textarea' || tag === 'select');
+    const diKolomTeks = (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target.isContentEditable);
 
     // Ctrl/Cmd+Z tetap berlaku walau fokus ada di kolom teks: pengguna
     // menganggapnya "urungkan perubahan peta", bukan undo ketikan.

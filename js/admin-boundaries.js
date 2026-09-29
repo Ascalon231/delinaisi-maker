@@ -83,7 +83,8 @@ const AdminBoundaries = (function () {
   function levelOf(rank) {
     const r = Number(rank);
     if (!isFinite(r)) return { id: 'other', label: 'Lainnya' };
-    if (r <= 8) return { id: 'province', label: 'Provinsi' };
+    if (r <= 4)  return { id: 'country',  label: 'Nasional / Negara' };
+    if (r <= 8)  return { id: 'province', label: 'Provinsi' };
     if (r <= 12) return { id: 'regency', label: 'Kabupaten/Kota' };
     if (r <= 16) return { id: 'district', label: 'Kecamatan' };
     return { id: 'village', label: 'Kelurahan/Desa' };
@@ -127,6 +128,44 @@ const AdminBoundaries = (function () {
     return out.trim() || String(q || '').trim();
   }
 
+  /* -------------------- Mode laut/darat -------------------- */
+  // 'any'  = tampilkan batas resmi termasuk wilayah laut (default)
+  // 'land' = saring: untuk MultiPolygon, ambil sub-polygon terkecil yang
+  //           mewakili daratan (heuristik: biasanya area yang lebih kecil).
+  //           Ini tidak sempurna, tapi menghilangkan potongan laut besar.
+  let seaMode = 'any';
+
+  function setSeaMode(mode) { seaMode = mode || 'any'; }
+
+  // Pilih sub-polygon yang paling mungkin mewakili daratan.
+  // Strategi: untuk MultiPolygon yang luasnya sangat besar, kurangi jumlah
+  // koordinat menjadi hanya ring/polygon yang tidak dominan laut.
+  // Ini adalah pendekatan kasar — Nominatim tidak menyediakan clip resmi.
+  function filterLand(geom) {
+    if (!geom || seaMode === 'any') return geom;
+    if (geom.type === 'Polygon') return geom; // polygon tunggal tetap apa adanya
+    if (geom.type !== 'MultiPolygon') return geom;
+    // Hitung luas semu tiap poligon (bounding box * koordinat = perkiraan)
+    const polys = geom.coordinates;
+    if (polys.length <= 1) return geom;
+    // Pakai luas bounding box sebagai indikator: pilih semua polygon kecuali
+    // yang luasnya lebih dari 5x rata-rata (kemungkinan besar laut).
+    const areas = polys.map(poly => {
+      const ring = poly[0];
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      ring.forEach(([x, y]) => {
+        if (x < minX) minX = x; if (x > maxX) maxX = x;
+        if (y < minY) minY = y; if (y > maxY) maxY = y;
+      });
+      return (maxX - minX) * (maxY - minY);
+    });
+    const avg = areas.reduce((a, b) => a + b, 0) / areas.length;
+    const selected = polys.filter((_, i) => areas[i] <= avg * 5);
+    if (!selected.length) return geom;
+    if (selected.length === 1) return { type: 'Polygon', coordinates: selected[0] };
+    return { type: 'MultiPolygon', coordinates: selected };
+  }
+
   /* -------------------- Pencarian -------------------- */
   function search(query, level) {
     const key = 'q:' + cleanQuery(query).toLowerCase() + '|' + (level || 'any');
@@ -135,15 +174,19 @@ const AdminBoundaries = (function () {
       return Promise.resolve({ results: cached, fromCache: true });
     }
 
-    const params = new URLSearchParams({
+    // Untuk level nasional, jangan batasi ke countrycodes tertentu
+    // agar batas Indonesia (relasi OSM) bisa ditemukan.
+    const paramObj = {
       format: 'jsonv2',
       q: cleanQuery(query),
       polygon_geojson: '1',
       limit: '8',
       addressdetails: '1',
-      'accept-language': 'id',
-      countrycodes: 'id'   // aplikasi ini dipakai untuk wilayah Indonesia
-    });
+      'accept-language': 'id'
+    };
+    if (level !== 'country') paramObj.countrycodes = 'id';
+
+    const params = new URLSearchParams(paramObj);
     const url = 'https://nominatim.openstreetmap.org/search?' + params.toString();
 
     return throttle(() => fetch(url, { headers: { Accept: 'application/json' } }))
@@ -169,6 +212,7 @@ const AdminBoundaries = (function () {
       });
   }
 
+
   /* -------------------- Menggambar lapisan -------------------- */
   function ensureLayer() {
     if (!layerGroup) {
@@ -193,7 +237,8 @@ const AdminBoundaries = (function () {
   function draw(result) {
     const g = ensureLayer();
     g.clearLayers();
-    g.addData({ type: 'Feature', properties: {}, geometry: result.geom });
+    const geom = filterLand(result.geom);
+    g.addData({ type: 'Feature', properties: {}, geometry: geom });
 
     if (!map.hasLayer(g)) g.addTo(map);
     g.bringToFront();
@@ -203,6 +248,7 @@ const AdminBoundaries = (function () {
     }
     lastResult = result;
   }
+
 
   function clear() {
     if (layerGroup) {
@@ -246,6 +292,8 @@ const AdminBoundaries = (function () {
     cleanQuery: cleanQuery,
     countPoints: countPoints,
     isRealBoundary: isRealBoundary,
+    setSeaMode: setSeaMode,
+    filterLand: filterLand,
     get current() { return lastResult; },
     clearCache: function () {
       try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
