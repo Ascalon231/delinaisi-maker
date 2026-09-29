@@ -2388,8 +2388,10 @@ function showAdminLoaded(r) {
   box.classList.remove('hidden');
   $('#admin-loaded-name').textContent = r.short;
   const lv = AdminBoundaries.levelOf(r.rank);
+  const count = r.geom ? AdminBoundaries.countPoints(r.geom) : (r.featuresList ? r.featuresList.reduce((acc, f) => acc + AdminBoundaries.countPoints(f.geom), 0) : 0);
+  const src = r.source || ('OSM ' + (r.osm || ''));
   $('#admin-loaded-meta').textContent =
-    lv.label + ' · ' + AdminBoundaries.countPoints(r.geom).toLocaleString('id-ID') + ' titik · OSM ' + r.osm;
+    lv.label + ' · ' + count.toLocaleString('id-ID') + ' titik · ' + src;
   const show = $('#admin-show');
   if (show) show.checked = true;
 }
@@ -2411,10 +2413,13 @@ function runAdminSearch() {
     .then(({ results, fromCache }) => {
       renderAdminResults(results);
       if (!results.length) {
-        const q = AdminBoundaries.cleanQuery(($('#admin-q').value || ''));
-        adminStatus('Tidak ditemukan untuk "' + q + '". Coba tulis nama wilayahnya saja ' +
+        const qClean = AdminBoundaries.cleanQuery(($('#admin-q').value || ''));
+        adminStatus('Tidak ditemukan untuk "' + qClean + '". Coba tulis nama wilayahnya saja ' +
           '(mis. "Cibinong, Bogor" atau "Kabupaten Bogor") — kata seperti "Kecamatan" ' +
           'biasanya tidak dipakai di data OpenStreetMap.', true);
+
+        // Cek apakah cocok dengan data resmi Kemendagri / BPS
+        suggestOfficialAlternative(qClean);
       } else {
         adminStatus(results.length + ' batas ditemukan' +
           (fromCache ? ' (dari cache, tanpa memanggil server).' : '. Klik salah satu untuk memuat.'));
@@ -2426,18 +2431,328 @@ function runAdminSearch() {
     .then(() => { btn.disabled = false; });
 }
 
-function bindAdminBoundaries() {
-  const btn = $('#admin-search');
-  if (!btn) return;
+function suggestOfficialAlternative(q) {
+  const box = $('#admin-results');
+  if (!box) return;
+  const qLower = q.toLowerCase();
+  const provs = AdminBoundaries.getProvinces();
+  let matchedKab = null;
+  let matchedProv = null;
 
-  btn.addEventListener('click', runAdminSearch);
-  // Enter di kolom nama = cari (tetap atas permintaan user, bukan saat mengetik).
-  $('#admin-q').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { e.preventDefault(); runAdminSearch(); }
-  });
-  $('#admin-level').addEventListener('change', () => {
-    if (($('#admin-q').value || '').trim().length >= 3) runAdminSearch();
-  });
+  for (const p of provs) {
+    for (const k of (p.kab || [])) {
+      const kClean = k.name.toLowerCase().replace(/^(kabupaten|kota)\s+/i, '');
+      if (k.name.toLowerCase().includes(qLower) || qLower.includes(kClean)) {
+        matchedKab = k;
+        matchedProv = p;
+        break;
+      }
+    }
+    if (matchedKab) break;
+  }
+
+  if (matchedKab && matchedProv) {
+    const tip = document.createElement('div');
+    tip.className = 'admin-item';
+    tip.style.borderColor = 'var(--primary)';
+    tip.style.background = '#eef4ff';
+    tip.innerHTML =
+      '<span class="admin-item-main">' +
+        '<span class="admin-item-name" style="color:var(--primary)">🏛️ Tersedia di Katalog Resmi BPS: ' + esc(matchedKab.name) + '</span>' +
+        '<span class="admin-item-sub">Provinsi ' + esc(matchedProv.name) + ' · 100% lengkap semua kecamatan</span>' +
+      '</span>' +
+      '<span class="admin-item-meta">' +
+        '<button type="button" class="btn btn-secondary btn-sm" id="admin-btn-jump-catalog" style="font-size:11px;padding:3px 8px">Buka di Katalog</button>' +
+      '</span>';
+
+    tip.querySelector('#admin-btn-jump-catalog').addEventListener('click', () => {
+      switchAdminTab('official');
+      const provSel = $('#admin-sel-prov');
+      if (provSel) {
+        provSel.value = matchedProv.id;
+        provSel.dispatchEvent(new Event('change'));
+        setTimeout(() => {
+          const kabSel = $('#admin-sel-kab');
+          if (kabSel) {
+            kabSel.value = matchedKab.id;
+            kabSel.dispatchEvent(new Event('change'));
+          }
+        }, 50);
+      }
+    });
+
+    box.appendChild(tip);
+  }
+}
+
+function switchAdminTab(tabName) {
+  const officialBtn = $('#admin-tab-official');
+  const searchBtn = $('#admin-tab-search');
+  const officialPane = $('#admin-pane-official');
+  const searchPane = $('#admin-pane-search');
+
+  if (tabName === 'search') {
+    if (officialBtn) { officialBtn.classList.remove('active'); officialBtn.setAttribute('aria-selected', 'false'); }
+    if (searchBtn) { searchBtn.classList.add('active'); searchBtn.setAttribute('aria-selected', 'true'); }
+    if (officialPane) officialPane.classList.add('hidden');
+    if (searchPane) searchPane.classList.remove('hidden');
+  } else {
+    if (officialBtn) { officialBtn.classList.add('active'); officialBtn.setAttribute('aria-selected', 'true'); }
+    if (searchBtn) { searchBtn.classList.remove('active'); searchBtn.setAttribute('aria-selected', 'false'); }
+    if (officialPane) officialPane.classList.remove('hidden');
+    if (searchPane) searchPane.classList.add('hidden');
+  }
+}
+
+let currentOfficialDistricts = [];
+
+function bindAdminBoundaries() {
+  // ---- Tab Switching ----
+  const officialTabBtn = $('#admin-tab-official');
+  const searchTabBtn = $('#admin-tab-search');
+  if (officialTabBtn) {
+    officialTabBtn.addEventListener('click', () => switchAdminTab('official'));
+  }
+  if (searchTabBtn) {
+    searchTabBtn.addEventListener('click', () => switchAdminTab('search'));
+  }
+
+  // ---- Katalog Resmi Dropdowns ----
+  const provSel = $('#admin-sel-prov');
+  const kabSel = $('#admin-sel-kab');
+  const kecSel = $('#admin-sel-kec');
+  const levelSel = $('#admin-official-level');
+  const loadKecBtn = $('#admin-btn-load-kec');
+  const loadAllBtn = $('#admin-btn-load-all');
+  const officialStatusEl = $('#admin-official-status');
+
+  function adminOfficialStatus(text, isError = false) {
+    if (!officialStatusEl) return;
+    officialStatusEl.textContent = text;
+    officialStatusEl.classList.toggle('is-error', !!isError);
+  }
+
+  // Isi dropdown provinsi dari INDONESIA_ADM
+  if (provSel) {
+    const provs = AdminBoundaries.getProvinces();
+    const sorted = [...provs].sort((a, b) => a.name.localeCompare(b.name, 'id'));
+    sorted.forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      provSel.appendChild(opt);
+    });
+
+    provSel.addEventListener('change', () => {
+      const provId = provSel.value;
+      kabSel.innerHTML = '<option value="">Pilih Kab/Kota…</option>';
+      kecSel.innerHTML = '<option value="">Pilih wilayah…</option>';
+      kabSel.disabled = true;
+      kecSel.disabled = true;
+      loadKecBtn.disabled = true;
+      loadAllBtn.disabled = true;
+      currentOfficialDistricts = [];
+
+      if (!provId) {
+        adminOfficialStatus('Pilih Provinsi dan Kabupaten/Kota untuk memuat batas wilayah resmi.');
+        return;
+      }
+
+      const regencies = AdminBoundaries.getRegencies(provId);
+      const sortedRegs = [...regencies].sort((a, b) => a.name.localeCompare(b.name, 'id'));
+      sortedRegs.forEach(k => {
+        const opt = document.createElement('option');
+        opt.value = k.id;
+        opt.textContent = k.name;
+        kabSel.appendChild(opt);
+      });
+      kabSel.disabled = false;
+      const provText = provSel.selectedOptions[0]?.text || '';
+      adminOfficialStatus(`Provinsi ${provText} dipilih. Silakan pilih Kabupaten/Kota.`);
+    });
+  }
+
+  function loadDistrictsForSelectedKab() {
+    const kabId = kabSel.value;
+    const provId = provSel.value;
+    kecSel.innerHTML = '<option value="">Pilih wilayah…</option>';
+    kecSel.disabled = true;
+    loadKecBtn.disabled = true;
+    loadAllBtn.disabled = true;
+    currentOfficialDistricts = [];
+
+    if (!kabId) return;
+
+    const regencies = AdminBoundaries.getRegencies(provId);
+    const kabObj = regencies.find(k => String(k.id) === String(kabId));
+    const kabName = kabObj ? kabObj.name : 'Kabupaten/Kota';
+
+    // Fly ke koordinat kabupaten
+    if (kabObj && kabObj.lat && kabObj.lng && map) {
+      map.flyTo([kabObj.lat, kabObj.lng], 10, { duration: 0.8 });
+    }
+
+    const level = levelSel ? levelSel.value : 'kecamatan';
+    const isDesa = level === 'desa';
+    const levelName = isDesa ? 'Kelurahan / Desa' : 'Kecamatan';
+
+    adminOfficialStatus(`Mengambil data ${levelName} untuk ${kabName}…`);
+
+    AdminBoundaries.fetchDistricts(kabId, level)
+      .then(list => {
+        currentOfficialDistricts = list;
+        if (!list || !list.length) {
+          adminOfficialStatus(`Data ${levelName} belum tersedia untuk ${kabName}.`, true);
+          return;
+        }
+
+        const sorted = [...list].sort((a, b) => (a.nama || '').localeCompare(b.nama || '', 'id'));
+        kecSel.innerHTML = '';
+
+        const optAll = document.createElement('option');
+        optAll.value = '__all__';
+        optAll.textContent = `── Semua ${levelName} (${sorted.length} Wilayah) ──`;
+        kecSel.appendChild(optAll);
+
+        sorted.forEach(item => {
+          const opt = document.createElement('option');
+          opt.value = item.kode || item.nama;
+          const parentText = item.parent_nama ? ` (Kec. ${item.parent_nama})` : '';
+          opt.textContent = `${item.nama}${parentText}`;
+          kecSel.appendChild(opt);
+        });
+
+        kecSel.disabled = false;
+        loadKecBtn.disabled = false;
+        loadAllBtn.disabled = false;
+        adminOfficialStatus(`${sorted.length} ${levelName} siap ditampilkan untuk ${kabName}.`);
+      })
+      .catch(err => {
+        adminOfficialStatus(`Gagal memuat data: ${err.message || 'Cek koneksi internet.'}`, true);
+      });
+  }
+
+  if (kabSel) {
+    kabSel.addEventListener('change', loadDistrictsForSelectedKab);
+  }
+
+  if (levelSel) {
+    levelSel.addEventListener('change', () => {
+      const isDesa = levelSel.value === 'desa';
+      const subLabel = $('#admin-sel-sub-label');
+      if (subLabel) subLabel.textContent = isDesa ? 'Pilih Kelurahan / Desa' : 'Pilih Kecamatan';
+      const allBtn = $('#admin-btn-load-all');
+      if (allBtn) allBtn.textContent = isDesa ? 'Semua Desa' : 'Semua Kecamatan';
+      if (kabSel && kabSel.value) {
+        loadDistrictsForSelectedKab();
+      }
+    });
+  }
+
+  function displayOfficialBoundary(loadAll = false) {
+    if (!currentOfficialDistricts || !currentOfficialDistricts.length) return;
+
+    const kabId = kabSel.value;
+    const provId = provSel.value;
+    const regencies = AdminBoundaries.getRegencies(provId);
+    const kabObj = regencies.find(k => String(k.id) === String(kabId));
+    const kabName = kabObj ? kabObj.name : 'Kabupaten/Kota';
+    const level = levelSel ? levelSel.value : 'kecamatan';
+    const isDesa = level === 'desa';
+    const levelPrefix = isDesa ? 'Desa/Kel.' : 'Kecamatan';
+
+    const targetVal = loadAll ? '__all__' : (kecSel.value || '__all__');
+
+    if (targetVal === '__all__') {
+      const featuresList = [];
+      currentOfficialDistricts.forEach(item => {
+        const geom = AdminBoundaries.pathToGeometry(item.path);
+        if (geom) {
+          const pName = item.parent_nama ? ` (Kec. ${item.parent_nama})` : '';
+          featuresList.push({
+            name: `${levelPrefix} ${item.nama}${pName}`,
+            geom: geom,
+            rawItem: item
+          });
+        }
+      });
+
+      if (!featuresList.length) {
+        adminOfficialStatus('Tidak ada geometri batas yang valid.', true);
+        return;
+      }
+
+      const result = {
+        name: `Semua ${levelPrefix} di ${kabName}`,
+        short: `${featuresList.length} ${levelPrefix} (${kabName})`,
+        rank: isDesa ? 18 : 14,
+        osm: `resmi/${kabId}/all`,
+        geom: null,
+        featuresList: featuresList,
+        source: 'BPS / Kemendagri',
+        isOfficial: true,
+        isCollection: true
+      };
+
+      AdminBoundaries.draw(result);
+      showAdminLoaded(result);
+
+      const b = AdminBoundaries.getBounds();
+      if (b && map) {
+        map.flyToBounds(b, { duration: 0.8, padding: [30, 30] });
+      }
+      adminOfficialStatus(`${featuresList.length} ${levelPrefix} berhasil ditampilkan.`);
+    } else {
+      const item = currentOfficialDistricts.find(it => (it.kode || it.nama) === targetVal);
+      if (!item) return;
+
+      const geom = AdminBoundaries.pathToGeometry(item.path);
+      if (!geom) {
+        adminOfficialStatus(`Geometri untuk ${item.nama} tidak valid.`, true);
+        return;
+      }
+
+      const pName = item.parent_nama ? ` (Kec. ${item.parent_nama})` : '';
+      const result = {
+        name: `${levelPrefix} ${item.nama}${pName}, ${kabName}`,
+        short: `${levelPrefix} ${item.nama}`,
+        rank: isDesa ? 18 : 14,
+        osm: `resmi/${item.kode || item.nama}`,
+        geom: geom,
+        source: 'BPS / Kemendagri',
+        isOfficial: true,
+        rawItem: item
+      };
+
+      AdminBoundaries.draw(result);
+      showAdminLoaded(result);
+
+      const b = AdminBoundaries.getBounds();
+      if (b && map) {
+        map.flyToBounds(b, { duration: 0.8, padding: [30, 30] });
+      }
+      adminOfficialStatus(`Batas ${result.short} berhasil ditampilkan.`);
+    }
+  }
+
+  if (loadKecBtn) {
+    loadKecBtn.addEventListener('click', () => displayOfficialBoundary(false));
+  }
+  if (loadAllBtn) {
+    loadAllBtn.addEventListener('click', () => displayOfficialBoundary(true));
+  }
+
+  // ---- Pencarian Bebas OSM ----
+  const btn = $('#admin-search');
+  if (btn) {
+    btn.addEventListener('click', runAdminSearch);
+    $('#admin-q').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); runAdminSearch(); }
+    });
+    $('#admin-level').addEventListener('change', () => {
+      if (($('#admin-q').value || '').trim().length >= 3) runAdminSearch();
+    });
+  }
 
   $('#admin-show').addEventListener('change', (e) => {
     AdminBoundaries.setVisible(e.target.checked);
@@ -2448,7 +2763,6 @@ function bindAdminBoundaries() {
   if (seaSel) {
     seaSel.addEventListener('change', () => {
       AdminBoundaries.setSeaMode(seaSel.value);
-      // Gambar ulang batas yang sudah dimuat dengan mode baru.
       const cur = AdminBoundaries.current;
       if (cur) AdminBoundaries.draw(cur);
     });
@@ -2459,11 +2773,36 @@ function bindAdminBoundaries() {
   if (toFeatBtn) {
     toFeatBtn.addEventListener('click', () => {
       const cur = AdminBoundaries.current;
-      if (!cur || !cur.geom) {
+      if (!cur) {
         toast('Muat batas terlebih dulu sebelum menyalin.', { type: 'error' });
         return;
       }
-      // Terapkan filter laut/darat sebelum menyalin.
+
+      // Jika koleksi multi-kecamatan
+      if (cur.isCollection && Array.isArray(cur.featuresList) && cur.featuresList.length) {
+        let addedCount = 0;
+        cur.featuresList.forEach((f, idx) => {
+          if (!f.geom) return;
+          let layer;
+          try {
+            layer = L.geoJSON({ type: 'Feature', geometry: f.geom, properties: {} });
+          } catch (e) { return; }
+          const sublayers = layer.getLayers();
+          if (!sublayers.length) return;
+          const subLayer = sublayers[0];
+          addFeature({ layer: subLayer, type: 'Polygon', name: f.name || `Wilayah ${idx + 1}` });
+          drawnItems.addLayer(subLayer);
+          addedCount++;
+        });
+        toast(`${addedCount} batas wilayah disalin ke daftar delinasi.`);
+        return;
+      }
+
+      // Batas tunggal
+      if (!cur.geom) {
+        toast('Muat batas terlebih dulu sebelum menyalin.', { type: 'error' });
+        return;
+      }
       const geom = AdminBoundaries.filterLand(cur.geom);
       let layer;
       try {
@@ -2472,14 +2811,13 @@ function bindAdminBoundaries() {
         toast('Gagal mengkonversi geometri batas.', { type: 'error' });
         return;
       }
-      // Leaflet.geoJSON mengembalikan group; ambil layer pertamanya.
       const sublayers = layer.getLayers();
       if (!sublayers.length) { toast('Geometri batas kosong.'); return; }
       const subLayer = sublayers[0];
       const type = (geom.type === 'Point' || geom.type === 'MultiPoint') ? 'Marker' : 'Polygon';
       addFeature({ layer: subLayer, type, name: cur.short || '' });
       drawnItems.addLayer(subLayer);
-      toast('Batas disalin ke daftar delinasi. Warna \u0026 detail bisa diatur bebas.');
+      toast('Batas disalin ke daftar delinasi. Warna & detail bisa diatur bebas.');
     });
   }
 
@@ -2490,6 +2828,7 @@ function bindAdminBoundaries() {
     const show = $('#admin-show');
     if (show) show.checked = false;
     adminStatus('Batas dihapus. Tekan tombol untuk mencari lagi.');
+    adminOfficialStatus('Batas dihapus. Silakan pilih wilayah untuk memuat kembali.');
   });
 }
 

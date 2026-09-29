@@ -998,6 +998,7 @@ test('batas administrasi: cari, muat, toggle, dan hapus', async ({ page }) => {
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   await page.locator('#admin-q').fill('Bogor');
   await page.locator('#admin-search').click();
   await page.waitForTimeout(1500);
@@ -1051,6 +1052,7 @@ test('batas administrasi: tidak autocomplete & kueri ulang pakai cache', async (
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   // Mengetik TIDAK boleh memicu permintaan (Nominatim melarang autocomplete)
   await page.locator('#admin-q').pressSequentially('Bogor', { delay: 120 });
   await page.waitForTimeout(1800);
@@ -1074,6 +1076,7 @@ test('batas administrasi: terpisah dari delinasi & masuk legenda formal', async 
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   await page.locator('#admin-q').fill('Bogor');
   await page.locator('#admin-search').click();
   await page.waitForTimeout(1200);
@@ -1104,6 +1107,7 @@ test('batas administrasi: status jelas saat gagal & saat kueri terlalu pendek', 
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   // Kueri terlalu pendek ditolak lebih dulu
   await page.locator('#admin-q').fill('Bo');
   await page.locator('#admin-search').click();
@@ -1124,6 +1128,7 @@ test('batas administrasi: legenda formal tetap terisi walau belum ada fitur', as
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   // Tanpa satu pun fitur delinasi, muat batas administrasi saja
   await expect(page.locator('#feat-count')).toHaveText('0');
   await page.locator('#admin-q').fill('Bogor');
@@ -1178,6 +1183,7 @@ test('batas administrasi: awalan tingkat dibuang agar pencarian berhasil', async
     await route.fulfill({ status: 200, contentType: 'application/json',
       body: JSON.stringify(NOMINATIM_FIXTURE) });
   });
+  await page.locator('#admin-tab-search').click();
   await page.locator('#admin-q').fill('Kecamatan Cibinong');
   await page.locator('#admin-search').click();
   await page.waitForTimeout(1500);
@@ -1194,6 +1200,7 @@ test('batas administrasi: pesan bantuan muncul saat tidak ada hasil', async ({ p
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   await page.locator('#admin-q').fill('Kecamatan Tidak Ada');
   await page.locator('#admin-search').click();
   await page.waitForTimeout(1500);
@@ -2554,6 +2561,7 @@ test('skeleton: muncul saat mencari batas lalu digantikan hasil', async ({ page 
   await page.waitForSelector('.leaflet-container', { timeout: 15000 });
   await page.waitForTimeout(1200);
 
+  await page.locator('#admin-tab-search').click();
   await page.locator('#admin-q').fill('Bogor');
   await page.locator('#admin-search').click();
   await page.waitForTimeout(400);
@@ -3264,6 +3272,7 @@ test('batas administrasi: tingkat nasional, filter laut vs daratan, dan salin ke
   expect(lvl.id).toBe('country');
 
   // Pilih tingkat nasional dan cari Indonesia
+  await page.locator('#admin-tab-search').click();
   await page.locator('#admin-level').selectOption('country');
   await page.locator('#admin-q').fill('Indonesia');
   await page.locator('#admin-search').click();
@@ -3523,6 +3532,185 @@ test('template kop instan: 1-klik mengisi identitas, tercermin di peta & tersimp
 
   const undoneTitle = await page.locator('#layout-title').inputValue();
   expect(undoneTitle).not.toBe('PETA DELINIASI KAWASAN PERENCANAAN');
+});
+
+/* ============================================================
+   Batas Resmi Administrasi (Katalog Kemendagri / BPS)
+   ============================================================ */
+
+const KECAMATAN_FIXTURE = [
+  {
+    kode: '32.01.01',
+    nama: 'Cibinong',
+    lat: -6.48,
+    lng: 106.85,
+    path: [[
+      [-6.47, 106.84], [-6.47, 106.86], [-6.49, 106.86], [-6.49, 106.84], [-6.47, 106.84]
+    ]]
+  },
+  {
+    kode: '32.01.02',
+    nama: 'Babakan Madang',
+    lat: -6.55,
+    lng: 106.87,
+    path: [[
+      [-6.54, 106.86], [-6.54, 106.88], [-6.56, 106.88], [-6.56, 106.86], [-6.54, 106.86]
+    ]]
+  }
+];
+
+const DESA_FIXTURE = [
+  {
+    kode: '32.01.01.1001',
+    nama: 'Pabuaran',
+    parent_nama: 'Cibinong',
+    lat: -6.48,
+    lng: 106.84,
+    path: [[
+      [-6.475, 106.835], [-6.475, 106.845], [-6.485, 106.845], [-6.485, 106.835], [-6.475, 106.835]
+    ]]
+  }
+];
+
+async function mockOfficialBoundaries(page) {
+  await page.route('**/geojson/kecamatan/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(KECAMATAN_FIXTURE)
+    });
+  });
+  await page.route('**/geojson/desa/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(DESA_FIXTURE)
+    });
+  });
+}
+
+test('katalog resmi BPS: dropdown hierarki Provinsi -> Kab/Kota -> Kecamatan', async ({ page }) => {
+  await mockOfficialBoundaries(page);
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Default tab adalah Katalog Resmi
+  await expect(page.locator('#admin-tab-official')).toHaveClass(/active/);
+  await expect(page.locator('#admin-pane-official')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#admin-pane-search')).toHaveClass(/hidden/);
+
+  // Provinsi harus berisi 38 opsi
+  const provCount = await page.locator('#admin-sel-prov option').count();
+  expect(provCount).toBeGreaterThanOrEqual(38);
+
+  // Pilih Jawa Barat (ID: 32)
+  await page.locator('#admin-sel-prov').selectOption('32');
+  await page.waitForTimeout(400);
+
+  // Kab/Kota aktif dan berisi Kabupaten Bogor
+  await expect(page.locator('#admin-sel-kab')).toBeEnabled();
+  const kabOptions = await page.locator('#admin-sel-kab option').allInnerTexts();
+  expect(kabOptions.some(t => t.includes('Kabupaten Bogor'))).toBe(true);
+
+  // Pilih Kabupaten Bogor (ID: 32.01)
+  await page.locator('#admin-sel-kab').selectOption('32.01');
+  await page.waitForTimeout(600);
+
+  // Kecamatan aktif dan memuat Cibinong
+  await expect(page.locator('#admin-sel-kec')).toBeEnabled();
+  await expect(page.locator('#admin-btn-load-kec')).toBeEnabled();
+  await expect(page.locator('#admin-btn-load-all')).toBeEnabled();
+  const kecOptions = await page.locator('#admin-sel-kec option').allInnerTexts();
+  expect(kecOptions.some(t => t.includes('Cibinong'))).toBe(true);
+});
+
+test('katalog resmi BPS: muat batas kecamatan resmi & salin ke delinasi', async ({ page }) => {
+  await mockOfficialBoundaries(page);
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Pilih Jawa Barat -> Kab Bogor
+  await page.locator('#admin-sel-prov').selectOption('32');
+  await page.waitForTimeout(300);
+  await page.locator('#admin-sel-kab').selectOption('32.01');
+  await page.waitForTimeout(600);
+
+  // Pilih Cibinong
+  await page.locator('#admin-sel-kec').selectOption('32.01.01');
+  await page.locator('#admin-btn-load-kec').click();
+  await page.waitForTimeout(600);
+
+  // Batas termuat di peta dan info terisi
+  await expect(page.locator('#admin-loaded')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#admin-loaded-name')).toHaveText('Kecamatan Cibinong');
+  await expect(page.locator('#admin-loaded-meta')).toContainText('BPS / Kemendagri');
+  expect(await page.evaluate(() => AdminBoundaries.hasData())).toBe(true);
+
+  // Salin batas ke delinasi user
+  await page.locator('#admin-to-feature').click();
+  await page.waitForTimeout(600);
+
+  // Fitur bertambah 1 dengan nama Kecamatan Cibinong
+  expect(await page.evaluate(() => features.length)).toBe(1);
+  await expect(page.locator('#feat-count')).toHaveText('1');
+  await expect(page.locator('.feat-name')).toHaveText('Kecamatan Cibinong');
+});
+
+test('katalog resmi BPS: muat semua kecamatan dalam satu kabupaten sekaligus', async ({ page }) => {
+  await mockOfficialBoundaries(page);
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  await page.locator('#admin-sel-prov').selectOption('32');
+  await page.waitForTimeout(300);
+  await page.locator('#admin-sel-kab').selectOption('32.01');
+  await page.waitForTimeout(600);
+
+  // Klik tombol "Semua Kecamatan"
+  await page.locator('#admin-btn-load-all').click();
+  await page.waitForTimeout(600);
+
+  await expect(page.locator('#admin-loaded')).not.toHaveClass(/hidden/);
+  await expect(page.locator('#admin-loaded-name')).toContainText('Kecamatan');
+  expect(await page.evaluate(() => AdminBoundaries.hasData())).toBe(true);
+
+  // Salin seluruh kecamatan ke delinasi
+  await page.locator('#admin-to-feature').click();
+  await page.waitForTimeout(600);
+
+  // Seluruh 2 kecamatan dalam fixture tersalin
+  expect(await page.evaluate(() => features.length)).toBe(2);
+  await expect(page.locator('#feat-count')).toHaveText('2');
+});
+
+test('katalog resmi BPS: saran alternatif saat pencarian OSM tidak menemukan hasil', async ({ page }) => {
+  await page.route('**/nominatim.openstreetmap.org/**', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: '[]'
+  }));
+
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1000);
+
+  // Buka tab Cari Bebas OSM
+  await page.locator('#admin-tab-search').click();
+  await page.locator('#admin-q').fill('Bogor');
+  await page.locator('#admin-search').click();
+  await page.waitForTimeout(1000);
+
+  // Muncul saran untuk membuka di katalog resmi BPS
+  await expect(page.locator('#admin-btn-jump-catalog')).toBeVisible();
+
+  // Klik "Buka di Katalog"
+  await page.locator('#admin-btn-jump-catalog').click();
+  await page.waitForTimeout(500);
+
+  // Otomatis pindah ke tab katalog resmi dengan Kab Bogor terpilih
+  await expect(page.locator('#admin-tab-official')).toHaveClass(/active/);
+  await expect(page.locator('#admin-sel-kab')).toHaveValue('32.01');
 });
 
 

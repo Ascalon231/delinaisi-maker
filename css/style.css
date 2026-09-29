@@ -1404,6 +1404,91 @@ body.is-webdriver .kop-accordion-card .kop-accordion-body {
 .toggle-inline { font-size: 11.5px; padding: 0; }
 .toggle-inline span { font-size: 11.5px; font-weight: 600; }
 
+.admin-tab-bar {
+  display: flex;
+  background: #f1f4f8;
+  border-radius: var(--r-md);
+  padding: 3px;
+  gap: 3px;
+  margin-top: 6px;
+  margin-bottom: 9px;
+  border: 1px solid var(--line);
+}
+.admin-tab-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 8px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-md) - 2px);
+  cursor: pointer;
+  transition: all .15s ease;
+  user-select: none;
+}
+.admin-tab-btn:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.5);
+}
+.admin-tab-btn.active {
+  background: #ffffff;
+  color: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.admin-tab-btn svg {
+  flex: none;
+}
+
+.admin-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-pane.hidden {
+  display: none !important;
+}
+
+.admin-official-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.admin-official-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 2px;
+}
+.admin-official-actions .admin-go {
+  flex: 1 1 auto;
+}
+.admin-official-actions .btn-ghost {
+  flex: none;
+  font-size: 11.5px;
+  padding: 5px 8px;
+}
+
+.admin-map-tooltip {
+  background: rgba(15, 23, 42, 0.92) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--r-sm) !important;
+  padding: 4px 8px !important;
+  font-family: var(--font-ui) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: .2px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+.admin-map-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.92) !important;
+}
+
 .admin-go { width: 100%; margin-top: 2px; }
 
 .admin-results { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }

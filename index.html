@@ -97,38 +97,98 @@
             <input type="checkbox" id="admin-show"><span>Tampil</span>
           </label>
         </div>
-        <p class="hint hint-tight">Lapisan terpisah dari delinasi Anda. Sumber: OpenStreetMap (ODbL), tanpa API key.</p>
+        <p class="hint hint-tight">Lapisan batas wilayah formal untuk dasar delinasi Anda.</p>
 
-        <label class="field field-tight">
-          <span>Nama wilayah</span>
-          <input id="admin-q" type="text" placeholder="mis. Kabupaten Bogor / Cibinong, Bogor" maxlength="80" autocomplete="off">
-        </label>
-        <div class="admin-grid-opts" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <label class="field field-tight">
-            <span>Tingkat</span>
-            <select id="admin-level">
-              <option value="any">Semua tingkat</option>
-              <option value="country">Nasional / Negara (Indonesia)</option>
-              <option value="province">Provinsi</option>
-              <option value="regency">Kabupaten / Kota</option>
-              <option value="district">Kecamatan</option>
-              <option value="village">Kelurahan / Desa</option>
-            </select>
-          </label>
-          <label class="field field-tight">
-            <span>Kawasan pesisir / laut</span>
-            <select id="admin-sea">
-              <option value="any" selected>Dengan perairan laut (resmi)</option>
-              <option value="land">Hanya daratan (garis pantai)</option>
-            </select>
-          </label>
+        <!-- Tab Mode Batas Administrasi -->
+        <div class="admin-tab-bar" id="admin-tab-bar" role="tablist">
+          <button type="button" class="admin-tab-btn active" id="admin-tab-official" data-admin-tab="official" role="tab" aria-selected="true">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 10v11M19 10v11M9 10v11M15 10v11M12 2L2 7h20L12 2z"/></svg>
+            <span>Katalog Resmi (BPS)</span>
+          </button>
+          <button type="button" class="admin-tab-btn" id="admin-tab-search" data-admin-tab="search" role="tab" aria-selected="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+            <span>Cari Bebas (OSM)</span>
+          </button>
         </div>
-        <button id="admin-search" class="btn btn-secondary admin-go">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
-          Cari &amp; muat batas
-        </button>
-        <p class="hint" id="admin-status">Tekan tombol untuk mencari (bukan otomatis, agar tidak melanggar batas kuota layanan publik OSM).</p>
-        <div id="admin-results" class="admin-results"></div>
+
+        <!-- PANE 1: KATALOG RESMI (BPS / Kemendagri) -->
+        <div class="admin-pane" id="admin-pane-official" role="tabpanel" aria-labelledby="admin-tab-official">
+          <div class="admin-official-grid">
+            <label class="field field-tight">
+              <span>Provinsi (38 Provinsi)</span>
+              <select id="admin-sel-prov">
+                <option value="">Pilih Provinsi…</option>
+              </select>
+            </label>
+            <label class="field field-tight">
+              <span>Kabupaten / Kota</span>
+              <select id="admin-sel-kab" disabled>
+                <option value="">Pilih Kab/Kota…</option>
+              </select>
+            </label>
+            <div class="admin-level-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <label class="field field-tight">
+                <span>Tingkat Wilayah</span>
+                <select id="admin-official-level">
+                  <option value="kecamatan" selected>Kecamatan</option>
+                  <option value="desa">Kelurahan / Desa</option>
+                </select>
+              </label>
+              <label class="field field-tight">
+                <span id="admin-sel-sub-label">Pilih Kecamatan</span>
+                <select id="admin-sel-kec" disabled>
+                  <option value="">Pilih wilayah…</option>
+                </select>
+              </label>
+            </div>
+          </div>
+          <div class="admin-official-actions">
+            <button type="button" id="admin-btn-load-kec" class="btn btn-secondary admin-go" disabled>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              Tampilkan Batas
+            </button>
+            <button type="button" id="admin-btn-load-all" class="btn btn-ghost btn-sm" disabled title="Tampilkan seluruh kecamatan di kabupaten ini">
+              Semua Kecamatan
+            </button>
+          </div>
+          <p class="hint" id="admin-official-status">Pilih Provinsi dan Kabupaten/Kota untuk memuat batas wilayah resmi.</p>
+        </div>
+
+        <!-- PANE 2: PENCARIAN BEBAS (OSM) -->
+        <div class="admin-pane hidden" id="admin-pane-search" role="tabpanel" aria-labelledby="admin-tab-search">
+          <label class="field field-tight">
+            <span>Nama wilayah</span>
+            <input id="admin-q" type="text" placeholder="mis. Kabupaten Bogor / Cibinong, Bogor" maxlength="80" autocomplete="off">
+          </label>
+          <div class="admin-grid-opts" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <label class="field field-tight">
+              <span>Tingkat</span>
+              <select id="admin-level">
+                <option value="any">Semua tingkat</option>
+                <option value="country">Nasional / Negara (Indonesia)</option>
+                <option value="province">Provinsi</option>
+                <option value="regency">Kabupaten / Kota</option>
+                <option value="district">Kecamatan</option>
+                <option value="village">Kelurahan / Desa</option>
+              </select>
+            </label>
+            <label class="field field-tight">
+              <span>Kawasan pesisir / laut</span>
+              <select id="admin-sea">
+                <option value="any" selected>Dengan perairan laut (resmi)</option>
+                <option value="land">Hanya daratan (garis pantai)</option>
+              </select>
+            </label>
+          </div>
+          <button id="admin-search" class="btn btn-secondary admin-go">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+            Cari &amp; muat batas
+          </button>
+          <p class="hint" id="admin-status">Tekan tombol untuk mencari (bukan otomatis, agar tidak melanggar batas kuota layanan publik OSM).</p>
+          <div id="admin-results" class="admin-results"></div>
+        </div>
+
+        <!-- SHARED: STATUS WILAYAH TERMUAT -->
         <div id="admin-loaded" class="admin-loaded hidden">
           <div class="admin-loaded-head">
             <span id="admin-loaded-name"></span>
@@ -920,6 +980,7 @@
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 
   <script src="js/history.js"></script>
+  <script src="js/indonesia-adm.js"></script>
   <script src="js/app.js"></script>
   <script src="js/admin-boundaries.js"></script>
   <script src="js/formal-layout.js"></script>

@@ -42,7 +42,7 @@ bisa langsung dicetak — bukan sekadar tangkapan layar peta.
 | Backend | **Tidak ada** |
 | Akun / autentikasi | **Tidak ada** |
 | Basis data | **Tidak ada** |
-| Testing | Playwright, **91 test** (`npm test`) |
+| Testing | Playwright, **100 test** (`npm test`) |
 | Deploy | GitHub Pages, branch `main`, folder `/` |
 
 Artinya: seluruh logika berjalan di browser pengguna, dan data peta tersimpan
@@ -194,7 +194,7 @@ pustaka dimuat dari CDN. `npm install` hanya untuk menjalankan test.
 
 ### Test
 
-- **Selalu jalankan `npm test` sebelum commit.** 91 test, ±8 menit.
+- **Selalu jalankan `npm test` sebelum commit.** 100 test, ±8 menit.
 - Test berada di `test/app.test.js`. Tambahkan test untuk setiap perbaikan
   bug — terutama bug yang "tampak berfungsi tapi tidak".
 - Pakai **fixture tiruan** untuk Nominatim, jangan panggil server publik dari
@@ -260,6 +260,7 @@ Tahap 1 — **Perkuat produk gratis** (tanpa backend)
 - [x] Skala kustom & preset: penyesuaian zoom peta otomatis via representative fraction (RF) dan sinkronisasi label skala
 - [x] Legenda informatif: opsi menampilkan total luas & panjang per kategori secara dinamis
 - [x] Batas administrasi lengkap: tingkat nasional hingga desa, filter kawasan laut vs daratan, dan salin batas langsung ke delinasi gambar
+- [x] Batas resmi alternatif (Katalog Kemendagri / BPS 38 Provinsi, 514 Kab/Kota, 7.200+ Kecamatan & Desa tanpa batas kuota)
 - [x] Pewarnaan & transparansi dinamis: slider kepekatan isian (fillOpacity) per fitur & per kategori, serta warna kustom fleksibel per fitur
 - Input titik koordinat manual (untuk memasukkan batas dari data resmi)
 - Ekspor SHP/KMZ
@@ -322,7 +323,7 @@ Daftar ini nyata dan sudah diperbaiki — jangan diulang.
 
 ```bash
 npm start                                     # jalankan lokal
-npm test                                      # 91 test
+npm test                                      # 100 test
 npm test -- -g "nama test"                    # jalankan test tertentu
 gh api repos/Ascalon231/delinaisi-maker/pages/builds/latest --jq '.status'
 git show afc4fb1:index.html                   # versi 5 preset (lama)

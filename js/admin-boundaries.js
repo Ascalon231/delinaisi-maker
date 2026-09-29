@@ -234,11 +234,41 @@ const AdminBoundaries = (function () {
     return layerGroup;
   }
 
+  const OFFICIAL_PALETTE = [
+    '#2563eb', '#059669', '#d97706', '#7c3aed',
+    '#db2777', '#0891b2', '#ea580c', '#4f46e5',
+    '#16a34a', '#ca8a04', '#9333ea', '#e11d48'
+  ];
+
   function draw(result) {
     const g = ensureLayer();
     g.clearLayers();
-    const geom = filterLand(result.geom);
-    g.addData({ type: 'Feature', properties: {}, geometry: geom });
+
+    if (result.isCollection && Array.isArray(result.featuresList)) {
+      result.featuresList.forEach((f, idx) => {
+        if (!f.geom) return;
+        const color = OFFICIAL_PALETTE[idx % OFFICIAL_PALETTE.length];
+        const sub = L.geoJSON({ type: 'Feature', properties: { name: f.name }, geometry: f.geom }, {
+          style: {
+            color: color,
+            weight: 2,
+            opacity: 0.9,
+            dashArray: '5 3',
+            fill: true,
+            fillColor: color,
+            fillOpacity: 0.12,
+            interactive: true
+          }
+        });
+        if (f.name) {
+          sub.bindTooltip(f.name, { sticky: true, className: 'admin-map-tooltip' });
+        }
+        g.addLayer(sub);
+      });
+    } else if (result.geom) {
+      const geom = filterLand(result.geom);
+      g.addData({ type: 'Feature', properties: {}, geometry: geom });
+    }
 
     if (!map.hasLayer(g)) g.addTo(map);
     g.bringToFront();
@@ -281,6 +311,123 @@ const AdminBoundaries = (function () {
     return !!(layerGroup && layerGroup.getLayers().length);
   }
 
+  /* -------------------- Katalog Wilayah Resmi (Kemendagri / BPS) -------------------- */
+  const DISTRICT_CACHE_KEY = 'delinaisi-admin-districts-v1';
+  const memDistrictCache = new Map();
+
+  function readDistrictStorageCache() {
+    try {
+      const raw = localStorage.getItem(DISTRICT_CACHE_KEY);
+      if (!raw) return {};
+      const data = JSON.parse(raw);
+      return (data && typeof data === 'object') ? data : {};
+    } catch (e) { return {}; }
+  }
+
+  function writeDistrictStorageCache(cache) {
+    try {
+      localStorage.setItem(DISTRICT_CACHE_KEY, JSON.stringify(cache));
+    } catch (e) {
+      try {
+        const keys = Object.keys(cache);
+        if (keys.length > 4) {
+          keys.slice(0, Math.floor(keys.length / 2)).forEach(k => delete cache[k]);
+          localStorage.setItem(DISTRICT_CACHE_KEY, JSON.stringify(cache));
+        }
+      } catch (e2) {}
+    }
+  }
+
+  function fixRing(coords) {
+    if (!Array.isArray(coords)) return null;
+    const ring = coords
+      .map(pt => {
+        if (!Array.isArray(pt) || pt.length < 2) return null;
+        const lat = Number(pt[0]);
+        const lng = Number(pt[1]);
+        if (isNaN(lat) || isNaN(lng)) return null;
+        return [lng, lat];
+      })
+      .filter(Boolean);
+
+    if (ring.length < 3) return null;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first[0] !== last[0] || first[1] !== last[1]) {
+      ring.push([first[0], first[1]]);
+    }
+    return ring;
+  }
+
+  function pathToGeometry(path) {
+    if (!path || !Array.isArray(path) || !path.length) return null;
+
+    if (typeof path[0][0] === 'number') {
+      const ring = fixRing(path);
+      return ring ? { type: 'Polygon', coordinates: [ring] } : null;
+    }
+
+    const rings = path.map(fixRing).filter(Boolean);
+    if (!rings.length) return null;
+
+    if (rings.length === 1) {
+      return { type: 'Polygon', coordinates: [rings[0]] };
+    } else {
+      return {
+        type: 'MultiPolygon',
+        coordinates: rings.map(r => [r])
+      };
+    }
+  }
+
+  function fetchDistricts(kabId, level) {
+    const lvl = (level === 'desa') ? 'desa' : 'kecamatan';
+    const cacheKey = `${lvl}:${kabId}`;
+
+    if (memDistrictCache.has(cacheKey)) {
+      return Promise.resolve(memDistrictCache.get(cacheKey));
+    }
+
+    const sCache = readDistrictStorageCache();
+    if (sCache[cacheKey]) {
+      memDistrictCache.set(cacheKey, sCache[cacheKey]);
+      return Promise.resolve(sCache[cacheKey]);
+    }
+
+    const primaryUrl = `https://cdn.jsdelivr.net/gh/hendisantika/spring-boot-indonesia-map@main/src/main/resources/static/geojson/${lvl}/${kabId}.json`;
+    const fallbackUrl = `https://raw.githubusercontent.com/hendisantika/spring-boot-indonesia-map/main/src/main/resources/static/geojson/${lvl}/${kabId}.json`;
+
+    return fetch(primaryUrl)
+      .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .catch(() => {
+        return fetch(fallbackUrl).then(r => {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        });
+      })
+      .then(data => {
+        const list = Array.isArray(data) ? data : [];
+        memDistrictCache.set(cacheKey, list);
+        sCache[cacheKey] = list;
+        writeDistrictStorageCache(sCache);
+        return list;
+      });
+  }
+
+  function getProvinces() {
+    return (typeof window !== 'undefined' && window.INDONESIA_ADM) ||
+           (typeof INDONESIA_ADM !== 'undefined' ? INDONESIA_ADM : []);
+  }
+
+  function getRegencies(provId) {
+    const provs = getProvinces();
+    const p = provs.find(item => String(item.id) === String(provId));
+    return p ? (p.kab || []) : [];
+  }
+
   return {
     search: search,
     draw: draw,
@@ -297,6 +444,16 @@ const AdminBoundaries = (function () {
     get current() { return lastResult; },
     clearCache: function () {
       try { localStorage.removeItem(CACHE_KEY); } catch (e) {}
+      try { localStorage.removeItem(DISTRICT_CACHE_KEY); } catch (e) {}
+      memDistrictCache.clear();
+    },
+    // ---- Metode Katalog Resmi (BPS / Kemendagri) ----
+    pathToGeometry: pathToGeometry,
+    fetchDistricts: fetchDistricts,
+    getProvinces: getProvinces,
+    getRegencies: getRegencies,
+    getBounds: function () {
+      return (layerGroup && layerGroup.getLayers().length) ? layerGroup.getBounds() : null;
     }
   };
 })();
