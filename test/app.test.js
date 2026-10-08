@@ -3713,6 +3713,86 @@ test('katalog resmi BPS: saran alternatif saat pencarian OSM tidak menemukan has
   await expect(page.locator('#admin-sel-kab')).toHaveValue('32.01');
 });
 
+/* ============================================================
+   Ukuran kertas tetap untuk PNG & cetak (multi-device)
+   Output PNG harus berasio kertas terpilih apa pun viewport-nya,
+   bukan mengikuti ukuran layar / mode responsif HP.
+   ============================================================ */
+
+test('kertas: kontrol ukuran & orientasi ada dan terpasang ke state', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // Kontrol harus ada di DOM (dekat tombol Layout siap cetak)
+  await expect(page.locator('#kop-paper-size')).toBeVisible();
+  await expect(page.locator('#kop-paper-orientation')).toBeVisible();
+
+  // Nilai bawaan: A4 mendatar
+  expect(await page.evaluate(() => layout.kop.paperSize)).toBe('A4');
+  expect(await page.evaluate(() => layout.kop.paperOrientation)).toBe('landscape');
+
+  // Ubah ukuran -> state ikut berubah & tersimpan
+  await page.locator('#kop-paper-size').selectOption('A3');
+  await page.waitForTimeout(350);
+  expect(await page.evaluate(() => layout.kop.paperSize)).toBe('A3');
+
+  await page.locator('#kop-paper-orientation').selectOption('portrait');
+  await page.waitForTimeout(350);
+  expect(await page.evaluate(() => layout.kop.paperOrientation)).toBe('portrait');
+
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem('delinaisi-maker-v1')).layout.kop);
+  expect(stored.paperSize).toBe('A3');
+  expect(stored.paperOrientation).toBe('portrait');
+});
+
+test('kertas: spesifikasi & stage px konsisten di semua viewport', async ({ page }) => {
+  await page.goto(APP);
+  await page.waitForSelector('.leaflet-container', { timeout: 15000 });
+  await page.waitForTimeout(1200);
+
+  // API baru wajib ada
+  expect(await page.evaluate(() => typeof PaperLayout.getPaperSpec)).toBe('function');
+  expect(await page.evaluate(() => typeof PaperLayout.paperStagePx)).toBe('function');
+
+  // Default A4 mendatar: area cetak 277 x 190 mm (297-20 x 210-20)
+  const spec = await page.evaluate(() => PaperLayout.getPaperSpec());
+  expect(spec.size).toBe('A4');
+  expect(spec.orientation).toBe('landscape');
+  expect(spec.printW).toBe(277);
+  expect(spec.printH).toBe(190);
+
+  // Stage px di desktop lebar
+  await page.setViewportSize({ width: 1500, height: 950 });
+  await page.waitForTimeout(600);
+  const desktop = await page.evaluate(() => PaperLayout.paperStagePx());
+  expect(desktop.w).toBeGreaterThan(900);
+  expect(desktop.h).toBeGreaterThan(500);
+
+  // Stage px di viewport HP sempit HARUS SAMA (tidak mengikuti layar)
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.waitForTimeout(600);
+  const mobile = await page.evaluate(() => PaperLayout.paperStagePx());
+  expect(mobile).toEqual(desktop);
+
+  // Rasio stage = rasio kertas (toleransi 1%)
+  const rasio = mobile.w / mobile.h;
+  const harap = 277 / 190;
+  expect(Math.abs(rasio - harap) / harap).toBeLessThan(0.01);
+
+  // Ganti ke A3 tegak -> rasio ikut berubah (tegak < 1)
+  await page.locator('#kop-paper-size').selectOption('A3');
+  await page.locator('#kop-paper-orientation').selectOption('portrait');
+  await page.waitForTimeout(400);
+  const tegak = await page.evaluate(() => PaperLayout.paperStagePx());
+  expect(tegak.h).toBeGreaterThan(tegak.w);
+  // A3 tegak area cetak: (297-20) x (420-20) = 277 x 400
+  const specTegak = await page.evaluate(() => PaperLayout.getPaperSpec());
+  expect(specTegak.printW).toBe(277);
+  expect(specTegak.printH).toBe(400);
+});
+
 
 
 

@@ -813,8 +813,26 @@
             </div>
           </div>
         </div>
+        <div class="kop-grid">
+          <label class="field field-tight">
+            <span>Ukuran kertas</span>
+            <select id="kop-paper-size">
+              <option value="A4" selected>A4 (210 × 297 mm)</option>
+              <option value="A3">A3 (297 × 420 mm)</option>
+              <option value="F4">F4 (215 × 330 mm)</option>
+              <option value="Letter">Letter (215,9 × 279,4 mm)</option>
+            </select>
+          </label>
+          <label class="field field-tight">
+            <span>Orientasi kertas</span>
+            <select id="kop-paper-orientation">
+              <option value="landscape" selected>Mendatar (Landscape)</option>
+              <option value="portrait">Tegak (Portrait)</option>
+            </select>
+          </label>
+        </div>
         <button id="btn-paper-preview" class="btn btn-primary paper-open">Layout siap cetak</button>
-        <p class="hint">A4, A3, F4, Letter · Tegak / mendatar · PNG / PDF</p>
+        <p class="hint">PNG &amp; PDF selalu memakai ukuran kertas di atas, apa pun ukuran layar/HP.</p>
       </section>
 
       <section class="card" id="cat-color-card">

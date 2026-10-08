@@ -853,6 +853,8 @@ const KOP_DEFAULTS = {
   northLetter: 'U',        // U | N
   scaleMode: 'auto',       // auto | custom
   scaleCustom: '25000',
+  paperSize: 'A4',         // A4 | A3 | F4 | Letter
+  paperOrientation: 'landscape', // landscape | portrait
   customBlocks: [],
   blokOrder: []
 };
@@ -968,7 +970,10 @@ const KOP_FIELDS = [
   { field: 'scaleMode',         id: 'kop-scale-mode' },
   { field: 'scaleCustom',       id: 'kop-scale-custom' },
   // Opsi legenda
-  { field: 'legendShowMeasure', id: 'kop-legend-show-measure', isBool: true }
+  { field: 'legendShowMeasure', id: 'kop-legend-show-measure', isBool: true },
+  // Ukuran kertas ekspor (PNG & cetak selalu memakai ini, bukan ukuran layar)
+  { field: 'paperSize',         id: 'kop-paper-size' },
+  { field: 'paperOrientation',  id: 'kop-paper-orientation' }
 ];
 
 function formatDateID(d) {
@@ -1470,6 +1475,11 @@ function bindLayout() {
       updateKopAccordionBadges();
       updateLayout();
       save();
+      // Ukuran kertas berubah -> perbarui aturan @page untuk cetak/PDF.
+      if ((field === 'paperSize' || field === 'paperOrientation') &&
+          typeof PaperLayout !== 'undefined' && PaperLayout.syncPageStyle) {
+        try { PaperLayout.syncPageStyle(); } catch (e) { /* diabaikan */ }
+      }
     };
     el.addEventListener('input', commit);
     el.addEventListener('change', commit);
@@ -1521,6 +1531,18 @@ function bindLayout() {
   $$('#tpl-row button').forEach(b => {
     b.addEventListener('click', () => applyTemplate(b.dataset.tpl));
   });
+
+  // Tombol "Layout siap cetak": buka dialog cetak/PDF dengan ukuran
+  // kertas terpilih (sebelumnya tombol ini belum berfungsi).
+  const btnPaper = $('#btn-paper-preview');
+  if (btnPaper && !btnPaper.__wired) {
+    btnPaper.__wired = true;
+    btnPaper.addEventListener('click', () => {
+      try {
+        if (typeof PaperLayout !== 'undefined') PaperLayout.open('print');
+      } catch (e) { /* diabaikan */ }
+    });
+  }
 
   initKopAccordion();
 }

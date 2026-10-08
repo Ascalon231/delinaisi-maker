@@ -20,7 +20,9 @@
    ============================================================ */
 
 @media print {
-  /* Lembar kop berbentuk lanskap -> kertas lanskap. */
+  /* Nilai cadangan bila JS belum sempat mengisi ukuran dinamis.
+     Aturan aktif ada di <style id="dm-page-size"> yang ditulis
+     PaperLayout.syncPageStyle() dari kertas terpilih. */
   @page { size: A4 landscape; margin: 10mm; }
 
   html, body {
@@ -97,4 +99,94 @@
 
   /* Cegah blok terpotong di tengah halaman */
   .fl-block, .formal-sheet { break-inside: avoid; }
+}
+
+/* ============================================================
+   Stage ekspor PNG: ukuran kertas TETAP, abaikan viewport.
+   js/print-layout.js mengunci #map-wrap ke paperStagePx() dan
+   menambah kelas `is-exporting` di <html> selama pemotretan.
+
+   Aturan ini di LAYAR (bukan @media print), jadi tidak melanggar
+   pemisahan AGENTS.md 4.3: pemilik #map-wrap tetap berkas ini.
+   Prefix `html.is-exporting` sengaja dipakai agar menang atas
+   aturan responsif <900px di formal-sheet.css (yang dimuat belakangan).
+   ============================================================ */
+html.is-exporting #app { overflow: visible !important; }
+html.is-exporting #map-wrap {
+  flex: none !important;
+  /* Margin putih di keliling lembar agar border tidak menempel tepi PNG
+     (test "border berada di dalam gambar" mensyaratkan jarak > 0). */
+  padding: 14px 16px !important;
+  margin: 0 !important;
+  background: #fff !important;
+  overflow: visible !important;
+}
+html.is-exporting #map-wrap.tpl-formal {
+  display: block !important;
+  padding: 14px 16px !important;
+  background: #fff !important;
+  overflow: visible !important;
+}
+html.is-exporting .formal-sheet {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  box-shadow: none !important;
+}
+/* Paksa grid desktop sesuai posisi panel (salinan aturan desktop
+   formal-sheet.css, dengan prefix agar menang atas media <900px). */
+html.is-exporting .formal-sheet.fl-pos-right {
+  grid-template-columns: 1fr 300px !important;
+  grid-template-rows: 1fr !important;
+}
+html.is-exporting .formal-sheet.fl-pos-right .fl-map-col { order: 1 !important; min-height: 0 !important; }
+html.is-exporting .formal-sheet.fl-pos-right .fl-panel {
+  order: 2 !important; flex-direction: column !important;
+  width: auto !important; height: auto !important; max-height: none !important;
+  overflow: hidden !important;
+}
+html.is-exporting .formal-sheet.fl-pos-left {
+  grid-template-columns: 300px 1fr !important;
+  grid-template-rows: 1fr !important;
+}
+html.is-exporting .formal-sheet.fl-pos-left .fl-panel {
+  order: 1 !important; flex-direction: column !important;
+  width: auto !important; height: auto !important; max-height: none !important;
+  overflow: hidden !important;
+}
+html.is-exporting .formal-sheet.fl-pos-left .fl-map-col { order: 2 !important; min-height: 0 !important; }
+html.is-exporting .formal-sheet.fl-pos-bottom {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: 1fr auto !important;
+}
+html.is-exporting .formal-sheet.fl-pos-bottom .fl-map-col { order: 1 !important; min-height: 0 !important; }
+html.is-exporting .formal-sheet.fl-pos-bottom .fl-panel {
+  order: 2 !important; flex-direction: row !important;
+  overflow-x: auto !important; overflow-y: hidden !important;
+  height: 185px !important; max-height: 230px !important; width: 100% !important;
+}
+html.is-exporting .formal-sheet.fl-pos-top {
+  grid-template-columns: 1fr !important;
+  grid-template-rows: auto 1fr !important;
+}
+html.is-exporting .formal-sheet.fl-pos-top .fl-panel {
+  order: 1 !important; flex-direction: row !important;
+  overflow-x: auto !important; overflow-y: hidden !important;
+  height: 185px !important; max-height: 230px !important; width: 100% !important;
+}
+html.is-exporting .formal-sheet.fl-pos-top .fl-map-col { order: 2 !important; min-height: 0 !important; }
+html.is-exporting .formal-sheet.fl-pos-bottom .fl-block,
+html.is-exporting .formal-sheet.fl-pos-top .fl-block {
+  border-bottom: 0 !important;
+  border-right: 1.2px solid #111111 !important;
+  flex: 0 0 auto !important;
+  min-width: 150px !important;
+  max-width: 320px !important;
+  width: auto !important;
+  height: 100% !important;
+}
+/* Selama ekspor, sembunyikan kilau edit agar PNG bersih. */
+html.is-exporting .fl-editable {
+  outline: none !important;
+  background: transparent !important;
 }
